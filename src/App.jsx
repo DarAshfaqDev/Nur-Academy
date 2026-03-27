@@ -1,6 +1,8 @@
 import { Component, useState, useEffect, useRef, useCallback } from "react";
 import { LISANUL_QURAN_PLAYLIST_ID, LISANUL_QURAN_PLAYLIST_ITEMS } from "./data/lisanulQuranPlaylist";
+import { MUALIM_UL_QURAN_PLAYLIST_ID, MUALIM_UL_QURAN_PLAYLIST_ITEMS } from "./data/mualimUlQuranPlaylist";
 import { NOORANI_QAIDA_PLAYLIST_ID, NOORANI_QAIDA_PLAYLIST_ITEMS } from "./data/nooraniQaidaPlaylist";
+import { TAJWEED_COURSE_PLAYLIST_ID, TAJWEED_COURSE_PLAYLIST_ITEMS } from "./data/tajweedCoursePlaylist";
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  🎬  HOW TO ADD YOUR YOUTUBE VIDEOS
@@ -529,6 +531,117 @@ const buildLisanModules = (items) =>
     );
   }).filter(section => section.lessons.length > 0);
 
+const mualimLessonTitle = ({ index, sourceTitle }) => {
+  const raw = String(sourceTitle || "").replace(/\s+/g, " ").trim();
+  if (raw === "[Hidden lesson]") return `Lesson ${pad(index)} - Hidden lesson`;
+
+  const homework = raw.match(/Home Work\s*\|\s*Unit\s*#?\s*(\d+)\s*Lesson\s*([0-9-]+)/i);
+  if (homework) return `Lesson ${pad(index)} - Homework: Unit ${homework[1]} Lessons ${homework[2]}`;
+
+  const revision = raw.match(/Revision Unit\s*(\d+)/i);
+  if (revision) return `Lesson ${pad(index)} - Revision Unit ${revision[1]}`;
+
+  const surprise = raw.match(/Unexpected Quran Challenge\s*\|\s*Unit\s*([0-9,]+)/i);
+  if (surprise) return `Lesson ${pad(index)} - Surprise Test: Units ${surprise[1].replace(/,/g, ", ")}`;
+
+  const part = raw.match(/Part\s*(\d+)/i);
+  if (part) return `Lesson ${pad(index)} - Part ${part[1]}`;
+
+  return `Lesson ${pad(index)} - Muallim ul Quran`;
+};
+const MUALIM_MODULE_BLUEPRINT = [
+  { title:"Module 1 - Unit 1 Foundations", icon:"📗", desc:"Opening lessons, homework checkpoints, and the first full revision.", range:[1, 7] },
+  { title:"Module 2 - Unit 2 Expansion", icon:"📘", desc:"Parts 4 to 7 with the Unit 2 revision session.", range:[8, 12] },
+  { title:"Module 3 - Unit 3 Practice", icon:"🧠", desc:"Parts 8 to 11 followed by the surprise test for Units 1 to 3.", range:[13, 17] },
+  { title:"Module 4 - Unit 4 Progression", icon:"📝", desc:"Parts 12 to 18 continuing the direct Quran understanding challenge.", range:[18, 24] },
+  { title:"Module 5 - Final Public Lessons", icon:"🏁", desc:"Parts 19 to 25 currently visible on the public playlist.", range:[25, 30] },
+  { title:"Module 6 - Hidden Playlist Lessons", icon:"🔒", desc:"Three additional lesson slots counted by YouTube but not publicly visible in the playlist feed.", range:[31, 33] },
+];
+const buildMualimModules = (items) =>
+  MUALIM_MODULE_BLUEPRINT.map((section, idx) => {
+    const [start, end] = section.range;
+    const lessons = items
+      .filter(item => item.index >= start && item.index <= end)
+      .map(item => mkLesson(
+        `l10${pad(item.index)}`,
+        mualimLessonTitle(item),
+        item.youtubeId,
+        item.duration || "Unavailable",
+        {
+          free: item.index <= 3,
+          desc: item.sourceTitle === "[Hidden lesson]"
+            ? "YouTube counts this lesson in the playlist total, but the video is currently hidden or unavailable in the public feed."
+            : "Imported from the Muallim ul Quran Understand Quran Directly in 6 Months playlist.",
+        }
+      ));
+
+    return mkModule(
+      `m10${String.fromCharCode(97 + idx)}`,
+      section.title,
+      section.icon,
+      section.desc,
+      lessons
+    );
+  }).filter(section => section.lessons.length > 0);
+
+const tajweedEpisodeNumber = ({ sourceTitle, index }) => {
+  const match = String(sourceTitle || "").match(/EP\s*[-–]?\s*(\d+)/i);
+  return match ? safeNum(match[1], index) : index;
+};
+const tajweedTopicTitle = ({ sourceTitle }) => {
+  const usefulParts = String(sourceTitle || "")
+    .split("|")
+    .map(part => part.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .filter(part => !/^(2025|2026)$/i.test(part))
+    .filter(part => !/^urdu$/i.test(part))
+    .filter(part => !/^detailed$/i.test(part))
+    .filter(part => !/^easy tajweed course$/i.test(part));
+
+  return usefulParts.slice(0, 2).join(" / ") || "Tajweed Lesson";
+};
+const TAJWEED_MODULE_BLUEPRINT = [
+  { title:"Module 1 - Foundations and Terminology", icon:"📚", desc:"Core terminology, common recitation mistakes, isti'adhah, and basmalah-related foundations.", range:[1, 6] },
+  { title:"Module 2 - Tafkhim and Noon Sakinah", icon:"🟢", desc:"Raa, the word Allah, and the introduction to noon sakinah and tanween rules.", range:[7, 11] },
+  { title:"Module 3 - Signs and Pronoun Rules", icon:"✍️", desc:"Special Quranic signs, meem sakin, ghunna, haa zameer, and sillah.", range:[12, 17] },
+  { title:"Module 4 - Idgham Families", icon:"🔁", desc:"Idgham branches, laam tareef, and the difference between idgham and mushaddad.", range:[18, 24] },
+  { title:"Module 5 - Hamza Rules", icon:"🧭", desc:"Foundational and advanced hamza rules across multiple Quran examples.", range:[25, 30] },
+  { title:"Module 6 - Advanced Alif and Sakinain", icon:"✨", desc:"Harakah on hamzah, ijtima e sakinain, and silent alif cases.", range:[31, 34] },
+];
+const buildTajweedModules = (items) => {
+  const ordered = [...items]
+    .sort((a, b) => tajweedEpisodeNumber(a) - tajweedEpisodeNumber(b) || a.index - b.index)
+    .map((item, idx) => ({
+      ...item,
+      sequence: idx + 1,
+      episode: tajweedEpisodeNumber(item),
+    }));
+
+  return TAJWEED_MODULE_BLUEPRINT.map((section, idx) => {
+    const [start, end] = section.range;
+    const lessons = ordered
+      .filter(item => item.sequence >= start && item.sequence <= end)
+      .map(item => mkLesson(
+        `l2${pad(item.sequence)}`,
+        `Lesson ${pad(item.sequence)} - ${tajweedTopicTitle(item)}`,
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.sequence <= 3,
+          desc: `Imported from Qari Aqib's Easy Tajweed Course YouTube playlist (Episode ${pad(item.episode)}).`,
+        }
+      ));
+
+    return mkModule(
+      `m2${String.fromCharCode(97 + idx)}`,
+      section.title,
+      section.icon,
+      section.desc,
+      lessons
+    );
+  }).filter(section => section.lessons.length > 0);
+};
+
 const COURSES = [
   {
     id:1, slug:"learn-quran",
@@ -566,32 +679,13 @@ const COURSES = [
   {
     id:2, slug:"tajweed-course",
     title:"Tajweed Course", titleAr:"علم التجويد",
-    instructor:"Ustadha Maryam Hassan", category:"Quran", level:"Intermediate",
-    rating:4.8, students:2180, price:49, isFree:false,
-    badge:"Top Rated", badgeC:C.gold,
+    instructor:"Qari Aqib", category:"Quran", level:"Intermediate",
+    rating:4.9, students:4120, price:0, isFree:true,
+    badge:"34 Videos", badgeC:C.gold,
     thumb:"📖", color:"#1A6B4E",
-    desc:"Master the rules of Tajweed. Covers Makharij, Sifaat, Noon Sakinah, Meem Sakinah, and all Madd rules.",
-    playlist:"YOUR_PLAYLIST_ID_HERE",
-    modules:[
-      mkModule("m2a","Module 1 — Foundations","📜","What is Tajweed and why it is obligatory",[
-        mkLesson("l2a1","Introduction to Tajweed","DEMO","12:00",{free:true,desc:"History and importance of Tajweed.",res:["Tajweed Rules Summary.pdf"]}),
-        mkLesson("l2a2","Why Correct Recitation Matters","DEMO","15:30",{free:true,desc:"Evidence from Quran and Sunnah on beautiful recitation."}),
-        mkLesson("l2a3","Introduction to Makharij","DEMO","20:00",{desc:"The 17 articulation points.",res:["Makharij Diagram.pdf"]}),
-      ]),
-      mkModule("m2b","Module 2 — Makharij & Sifaat","🗣","Articulation points and letter characteristics",[
-        mkLesson("l2b1","Makharij of the Throat","DEMO","22:15",{desc:"ء ه ع غ ح خ — six throat letters."}),
-        mkLesson("l2b2","Makharij of the Tongue","DEMO","28:40",{desc:"18 letters from 10 tongue positions.",res:["Tongue Positions.pdf"]}),
-        mkLesson("l2b3","Sifaat — Letter Characteristics","DEMO","25:00",{desc:"The 17 attributes and their opposites.",res:["Sifaat Card.pdf"]}),
-        mkLesson("l2b4","Qalqalah — The Echo Letters","DEMO","18:30",{desc:"قطب جد — five letters with listening exercises."}),
-      ]),
-      mkModule("m2c","Module 3 — Core Rules","⚖️","Noon Sakinah, Meem Sakinah, and Madd",[
-        mkLesson("l2c1","Rules of Noon Sakinah & Tanween","DEMO","30:00",{desc:"Izhaar, Idghaam, Iqlaab, Ikhfaa.",res:["Noon Sakinah Chart.pdf"]}),
-        mkLesson("l2c2","Rules of Meem Sakinah","DEMO","22:00",{desc:"Three rules with extensive examples."}),
-        mkLesson("l2c3","Rules of Madd — Elongation","DEMO","28:00",{desc:"All Madd types with measurements.",res:["Madd Complete Guide.pdf"]}),
-        mkLesson("l2c4","Waqf & Ibtida — Stop & Start","DEMO","20:00",{desc:"Correct pausing and resuming during recitation."}),
-        mkLesson("l2c5","Full Recitation Practice","DEMO","25:00",{desc:"Apply all rules to selected passages.",res:["Practice Passages.pdf"]}),
-      ]),
-    ],
+    desc:"A complete Urdu Tajweed video series covering terminology, noon sakinah and tanween, meem sakin, idgham families, hamza rules, and advanced Quran-reading cases.",
+    playlist:TAJWEED_COURSE_PLAYLIST_ID,
+    modules:buildTajweedModules(TAJWEED_COURSE_PLAYLIST_ITEMS),
   },
   {
     id:3, slug:"arabic-language",
@@ -603,6 +697,17 @@ const COURSES = [
     desc:"A full Lisan ul Quran series covering Quranic Arabic grammar, noun patterns, nominal and verbal sentences, jussive and passive forms, and advanced applied structures.",
     playlist:LISANUL_QURAN_PLAYLIST_ID,
     modules:buildLisanModules(LISANUL_QURAN_PLAYLIST_ITEMS),
+  },
+  {
+    id:10, slug:"mualim-ul-quran",
+    title:"Mualim ul Quran", titleAr:"معلم القرآن",
+    instructor:"Hamza Sabherwal & Dr. Ubaid", category:"Quran", level:"Beginner",
+    rating:4.9, students:3870, price:0, isFree:true,
+    badge:"33 Lessons", badgeC:C.gold,
+    thumb:"📙", color:"#2F6F4F",
+    desc:"A structured Muallim ul Quran challenge focused on understanding Quran directly in six months through guided lessons, homework checkpoints, revision sessions, and test-based practice.",
+    playlist:MUALIM_UL_QURAN_PLAYLIST_ID,
+    modules:buildMualimModules(MUALIM_UL_QURAN_PLAYLIST_ITEMS),
   },
   {
     id:4, slug:"seerah-prophet",
@@ -1479,7 +1584,7 @@ const HomePage = ({ setPage, setCourse }) => {
               <Btn size="lg" onClick={()=>setPage("register")} style={{background:"rgba(255,255,255,.1)",color:"white",border:"1px solid rgba(255,255,255,.3)",borderRadius:10}}>Join Free Today</Btn>
             </div>
             <div style={{display:"flex",gap:28}}>
-              {[{v:`${COURSES.filter(c=>c.isFree).length}`,l:"Free Courses"},{v:"9",l:"Total Courses"},{v:String(COURSES.reduce((a,c)=>a+c.modules.length,0)),l:"Modules"},{v:"🔥",l:"Streak System"}].map((s,i)=>(
+              {[{v:`${COURSES.filter(c=>c.isFree).length}`,l:"Free Courses"},{v:String(COURSES.length),l:"Total Courses"},{v:String(COURSES.reduce((a,c)=>a+c.modules.length,0)),l:"Modules"},{v:"🔥",l:"Streak System"}].map((s,i)=>(
                 <div key={i} style={{textAlign:"center"}}>
                   <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.4rem",fontWeight:700,color:C.gold}}>{s.v}</div>
                   <div style={{fontSize:".68rem",color:"rgba(255,255,255,.48)",textTransform:"uppercase",letterSpacing:".05em"}}>{s.l}</div>
@@ -1550,7 +1655,7 @@ const HomePage = ({ setPage, setCourse }) => {
             {COURSES.slice(0,6).map(c=><CourseCard key={c.id} course={c} onClick={c=>{setCourse(c);setPage("course-detail");}}/>)}
           </div>
           <div style={{textAlign:"center",marginTop:32}}>
-            <Btn size="lg" v="outline" onClick={()=>setPage("courses")}>View All 9 Courses →</Btn>
+            <Btn size="lg" v="outline" onClick={()=>setPage("courses")}>{`View All ${COURSES.length} Courses →`}</Btn>
           </div>
         </div>
       </section>
@@ -1941,7 +2046,9 @@ const LessonPage = ({ lessonData, setPage, setLesson }) => {
               </div>
             ) : (
               <div style={{marginBottom:12,padding:"10px 12px",borderRadius:10,background:"rgba(11,82,64,.18)",border:`1px solid ${C.em}38`,fontSize:".72rem",color:"rgba(255,255,255,.58)"}}>
-                This lesson is still using a placeholder video ID, so completion stays manual until a real YouTube lesson is added.
+                {curLs?.youtubeId === "DEMO"
+                  ? "This lesson is still using a placeholder video ID, so completion stays manual until a real YouTube lesson is added."
+                  : "This lesson is not currently available for in-site playback, so manual completion is shown instead."}
               </div>
             )}
             <div style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap"}}>

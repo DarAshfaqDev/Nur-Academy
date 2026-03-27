@@ -26,8 +26,10 @@ At the moment, the app is fully usable as a frontend-first product. User account
 
 The project currently includes real imported playlist data for:
 
+- Mualim ul Quran
 - Noorani Qaida
 - Lisan ul Quran
+- Tajweed Course
 
 Other courses in the UI can still be used as starter templates until you replace their placeholder lessons with real YouTube content.
 
@@ -154,10 +156,12 @@ Lessons with `youtubeId: "DEMO"` remain placeholders until real video IDs are ad
 ## Project Structure
 
 ```txt
-Nur Acadmy/
+Nur Academy/
 ├─ public/
 ├─ src/
 │  ├─ data/
+│  │  ├─ tajweedCoursePlaylist.js
+│  │  ├─ mualimUlQuranPlaylist.js
 │  │  ├─ nooraniQaidaPlaylist.js
 │  │  └─ lisanulQuranPlaylist.js
 │  └─ App.jsx
@@ -259,3 +263,4 @@ This app is a strong first version for:
 - onboarding early students
 
 For serious multi-user production use, Railway plus a backend database is the right next step.
+
