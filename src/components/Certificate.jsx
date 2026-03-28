@@ -67,7 +67,7 @@ function Certificate({ user, course, completion, onPrint }) {
   const frameRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
   const studentName = user?.name || "Student Name";
-  const courseName = course?.title || "Course Name";
+  const courseName = course?.selectedTrackLabel ? `${course?.title || "Course Name"} (${course.selectedTrackLabel} Track)` : (course?.title || "Course Name");
   const courseTitleAr = course?.titleAr || "";
   const certificateId = buildCertificateId(user, course, completion);
   const issueDate = formatCertificateDate(completion?.completedAt);

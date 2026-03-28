@@ -137,10 +137,11 @@ const injectCSS = () => {
 };
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
-const DEMO_ADMIN_EMAIL = "admin@nuracademy.com";
-const DEMO_ADMIN_PASSWORD = "NurAdmin123!";
-const DEMO_STUDENT_EMAIL = "student@nuracademy.com";
-const DEMO_STUDENT_PASSWORD = "NurStudent123!";
+const PRIMARY_ADMIN_NAME = "Dar Ishfaq";
+const PRIMARY_ADMIN_EMAIL = "moeedkamraan1123@gmail.com";
+const PRIMARY_ADMIN_PASSWORD_HASH = "11ef569de49831adfc2176f885eee9b97c858782e285a7433d1cba44a7716f6e";
+const LEGACY_DEMO_IDS = new Set(["nur_admin_demo", "nur_student_demo"]);
+const LEGACY_DEMO_EMAILS = new Set(["admin@nuracademy.com", "student@nuracademy.com"]);
 const WATCH_COMPLETE_THRESHOLD = 90;
 const WATCH_TICK_MS = 1000;
 const YT_API_SRC = "https://www.youtube.com/iframe_api";
@@ -208,9 +209,10 @@ const getInitials = (name="Nur Student") =>
 const newUserId = () => `u_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
 const defaultStreak = () => ({ count:0, lastDate:null, history:[] });
 const defaultWatchState = () => ({ watchedSeconds:0, duration:0, percent:0, completedAt:null, lastViewedAt:null, source:"watch" });
-const defaultUserState = () => ({ enrollments:[], progress:{}, notes:{}, streak:defaultStreak(), watch:{}, completions:{} });
+const defaultUserState = () => ({ enrollments:[], courseTracks:{}, progress:{}, notes:{}, streak:defaultStreak(), watch:{}, completions:{} });
 const mergeUserState = (raw={}) => ({
   enrollments: [...(raw.enrollments || [])],
+  courseTracks: { ...(raw.courseTracks || {}) },
   progress: { ...(raw.progress || {}) },
   notes: { ...(raw.notes || {}) },
   streak: { ...defaultStreak(), ...(raw.streak || {}) },
@@ -264,45 +266,62 @@ const Auth = {
     ls.set(K.DATA, all);
   },
   ensureSeeded: async () => {
+    const adminProfile = {
+      id: "nur_admin_primary",
+      name: PRIMARY_ADMIN_NAME,
+      email: PRIMARY_ADMIN_EMAIL,
+      role: "admin",
+      joinedAt: dayKey(),
+      country: "",
+      language: "English / Arabic",
+      passwordHash: PRIMARY_ADMIN_PASSWORD_HASH,
+    };
+
     const existing = Auth.users();
-    if (existing.length) {
-      existing.forEach(user => Auth.ensureUserData(user.id));
-      return existing;
+    let nextUsers = existing.filter(user =>
+      !LEGACY_DEMO_IDS.has(user.id) &&
+      !LEGACY_DEMO_EMAILS.has(normalizeEmail(user.email))
+    );
+
+    const existingAdminIndex = nextUsers.findIndex(
+      user => normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL
+    );
+
+    if (existingAdminIndex >= 0) {
+      const currentAdmin = nextUsers[existingAdminIndex];
+      nextUsers[existingAdminIndex] = {
+        ...currentAdmin,
+        name: PRIMARY_ADMIN_NAME,
+        email: PRIMARY_ADMIN_EMAIL,
+        role: "admin",
+        joinedAt: currentAdmin.joinedAt || adminProfile.joinedAt,
+        country: currentAdmin.country || adminProfile.country,
+        language: currentAdmin.language || adminProfile.language,
+        passwordHash: PRIMARY_ADMIN_PASSWORD_HASH,
+      };
+    } else {
+      nextUsers = [adminProfile, ...nextUsers];
     }
 
-    const [adminHash, studentHash] = await Promise.all([
-      hashText(DEMO_ADMIN_PASSWORD),
-      hashText(DEMO_STUDENT_PASSWORD),
-    ]);
+    if (!existing.length || JSON.stringify(existing) !== JSON.stringify(nextUsers)) {
+      ls.set(K.USERS, nextUsers);
+    }
 
-    const seeded = [
-      {
-        id: "nur_admin_demo",
-        name: "Nur Academy Admin",
-        email: DEMO_ADMIN_EMAIL,
-        role: "admin",
-        joinedAt: dayKey(),
-        country: "United States",
-        language: "English / Arabic",
-        passwordHash: adminHash,
-      },
-      {
-        id: "nur_student_demo",
-        name: "Nur Demo Student",
-        email: DEMO_STUDENT_EMAIL,
-        role: "student",
-        joinedAt: dayKey(),
-        country: "United States",
-        language: "English / Arabic",
-        passwordHash: studentHash,
-      },
-    ];
+    const allData = readAllUserData();
+    const nextData = {};
+    nextUsers.forEach(user => {
+      nextData[user.id] = mergeUserState(allData[user.id] || {});
+    });
+    if (JSON.stringify(allData) !== JSON.stringify(nextData)) {
+      ls.set(K.DATA, nextData);
+    }
 
-    ls.set(K.USERS, seeded);
-    const data = {};
-    seeded.forEach(user => { data[user.id] = defaultUserState(); });
-    ls.set(K.DATA, data);
-    return seeded;
+    const session = Auth.session();
+    if (session?.id && !nextUsers.some(user => user.id === session.id)) {
+      ls.remove(K.SESSION);
+    }
+
+    return nextUsers;
   },
   login: async ({ email, password }) => {
     await Auth.ensureSeeded();
@@ -371,8 +390,11 @@ const Auth = {
 const DB = {
   enrolled: () => readCurrentUserData().enrollments,
   isEnrolled: (id) => readCurrentUserData().enrollments.includes(id),
-  enroll: (id) => writeCurrentUserData(data => {
+  selectedTrack: (id) => readCurrentUserData().courseTracks[String(id)] || null,
+  enroll: (id, options={}) => writeCurrentUserData(data => {
+    const courseKey = String(id);
     if (!data.enrollments.includes(id)) data.enrollments.push(id);
+    if (options.trackKey) data.courseTracks[courseKey] = options.trackKey;
   }),
 
   progress: (cid) => readCurrentUserData().progress[String(cid)] || [],
@@ -494,6 +516,27 @@ const mkLesson = (id, title, ytId, dur, opts={}) => ({
   resources: opts.res || [],
 });
 const mkModule = (id, title, icon, desc, lessons) => ({ id, title, icon, description: desc, lessons });
+const AQIDAH_DEFAULT_TRACK = "english";
+const AQIDAH_TRACKS = {
+  english: {
+    key: "english",
+    label: "English",
+    note: "English Aqidah lectures and playlist.",
+    playlist: "PLdGFY6ZOJ73NLsvp6XBqR11tUMpWjXias",
+    lessonVideoIds: {
+      l5a1: "TlZfpadeYzY",
+    },
+  },
+  urdu: {
+    key: "urdu",
+    label: "Urdu",
+    note: "Urdu Aqidah lectures and playlist.",
+    playlist: "PLNzbRwIZdCEby9sHu5X9pT-QC6x4FpIEq",
+    lessonVideoIds: {
+      l5a1: "DwmgvPfzFXs",
+    },
+  },
+};
 const qaidaLessonTitle = ({ index, sourceTitle }) => {
   const parts = String(sourceTitle || "")
     .split("|")
@@ -712,10 +755,10 @@ const COURSES = [
     thumb:"🕌", color:C.em,
     desc:"Begin your Quran journey. Learn proper pronunciation, basic Tajweed, and read Arabic script from scratch.",
     // ↓ Replace with your actual YouTube Playlist ID
-    playlist:"YOUR_PLAYLIST_ID_HERE",
+    playlist:"PLnxcNqv_D41uTY3YHHFPgoXsDrCQBz9Ge",
     modules:[
       mkModule("m1a","Module 1 — Arabic Alphabet","ا","Master the 28 Arabic letters",[
-        mkLesson("l1a1","Welcome & Course Overview","DEMO","8:30",{free:true,desc:"Introduction to your Quran learning journey. What you will achieve by the end.",res:["Course Syllabus.pdf","Alphabet Chart.pdf"]}),
+        mkLesson("l1a1","Welcome & Course Overview","GrwrpA2H97A","8:30",{free:true,desc:"Introduction to your Quran learning journey. What you will achieve by the end.",res:["Course Syllabus.pdf","Alphabet Chart.pdf"]}),
         mkLesson("l1a2","Letters: Alif to Kha","DEMO","22:15",{free:true,desc:"The first 7 letters with correct mouth positioning.",res:["Letters Worksheet 1.pdf"]}),
         mkLesson("l1a3","Letters: Dal to Sheen","DEMO","19:45",{desc:"Letters 8-14. Practice reading and writing.",res:["Letters Worksheet 2.pdf"]}),
         mkLesson("l1a4","Letters: Sad to Ghayn","DEMO","21:10",{desc:"The emphatic letters unique to Arabic.",res:["Letters Worksheet 3.pdf"]}),
@@ -777,7 +820,7 @@ const COURSES = [
     badge:"Free", badgeC:C.em,
     thumb:"🌙", color:C.emD,
     desc:"A comprehensive, moving journey through the blessed life of Prophet Muhammad ﷺ — from birth to passing.",
-    playlist:"YOUR_PLAYLIST_ID_HERE",
+    playlist:"PLdGFY6ZOJ73NLsvp6XBqR11tUMpWjXias",
     modules:[
       mkModule("m4a","Module 1 — Before Revelation","🌅","Arabia before Islam and early life",[
         mkLesson("l4a1","Pre-Islamic Arabia","DEMO","22:00",{free:true,desc:"Social, religious, and political landscape.",res:["Arabia Map.pdf"]}),
@@ -808,11 +851,13 @@ const COURSES = [
     rating:4.8, students:2760, price:59, isFree:false,
     badge:"Essential", badgeC:"#7B3F00",
     thumb:"⭐", color:"#2D6A4F",
-    desc:"Establish a firm foundation in Islamic belief. Tawheed, Six Pillars of Iman, and core Islamic theology.",
-    playlist:"YOUR_PLAYLIST_ID_HERE",
+    desc:"Establish a firm foundation in Islamic belief. Tawheed, Six Pillars of Iman, and core Islamic theology, with English and Urdu study tracks available at enrollment.",
+    playlist:AQIDAH_TRACKS.english.playlist,
+    defaultTrack:AQIDAH_DEFAULT_TRACK,
+    trackOptions:AQIDAH_TRACKS,
     modules:[
       mkModule("m5a","Module 1 — Tawheed","☝️","Pure Monotheism — the most important knowledge",[
-        mkLesson("l5a1","Introduction to Aqidah","DEMO","15:00",{free:true,desc:"Why Aqidah is the foundation of everything."}),
+        mkLesson("l5a1","Introduction to Aqidah",AQIDAH_TRACKS.english.lessonVideoIds.l5a1,"15:00",{free:true,desc:"Why Aqidah is the foundation of everything."}),
         mkLesson("l5a2","Tawheed Al-Rububiyyah","DEMO","22:00",{desc:"Oneness of Allah's Lordship."}),
         mkLesson("l5a3","Tawheed Al-Uluhiyyah","DEMO","24:00",{desc:"Oneness in worship — the central message of all prophets."}),
         mkLesson("l5a4","Allah's Names & Attributes","DEMO","26:00",{desc:"What the Names and Attributes mean and do not mean.",res:["99 Names of Allah.pdf"]}),
@@ -843,10 +888,10 @@ const COURSES = [
     rating:4.7, students:1640, price:69, isFree:false,
     badge:null, thumb:"📜", color:"#1B4332",
     desc:"Study the prophetic traditions authentically. Covers 40 Hadith of Imam Nawawi with in-depth explanation.",
-    playlist:"YOUR_PLAYLIST_ID_HERE",
+    playlist:"PLsF39TzFrYcVlBmGk7c6eIhFotjljcvCZ",
     modules:[
       mkModule("m7a","Module 1 — Hadith Sciences","🔬","How Hadith were preserved and authenticated",[
-        mkLesson("l7a1","What is a Hadith?","DEMO","18:00",{free:true,desc:"Definition, structure (isnad + matn), importance."}),
+        mkLesson("l7a1","What is a Hadith?","jx3AIBGRQKI","18:00",{free:true,desc:"Definition, structure (isnad + matn), importance."}),
         mkLesson("l7a2","Classification of Hadith","DEMO","22:00",{desc:"Sahih, Hasan, Da'eef — grading system explained.",res:["Classification Chart.pdf"]}),
         mkLesson("l7a3","Major Hadith Collections","DEMO","20:00",{desc:"Bukhari, Muslim, the Six Books and their significance."}),
       ]),
@@ -906,12 +951,42 @@ const COURSES = [
     ],
   },
 ];
+const applyTrackToModules = (modules=[], lessonVideoIds={}) => modules.map(mod => ({
+  ...mod,
+  lessons: mod.lessons.map(lesson => ({
+    ...lesson,
+    youtubeId: lessonVideoIds[lesson.id] || lesson.youtubeId,
+  })),
+}));
+const selectCourseTrackKey = (course, preferredTrackKey) => {
+  if (!course?.trackOptions) return null;
+  const keys = Object.keys(course.trackOptions);
+  if (!keys.length) return null;
+  const fallback = course.trackOptions[course.defaultTrack] ? course.defaultTrack : keys[0];
+  const requested = preferredTrackKey || course.selectedTrackKey || DB.selectedTrack(course.id) || fallback;
+  return course.trackOptions[requested] ? requested : fallback;
+};
 const resolveCourse = (courseLike) => {
   if (!courseLike) return null;
-  return COURSES.find(course =>
+  const baseCourse = COURSES.find(course =>
     course.id === courseLike.id ||
     (course.slug && course.slug === courseLike.slug)
   ) || courseLike;
+
+  if (!baseCourse.trackOptions) return baseCourse;
+
+  const trackKey = selectCourseTrackKey(baseCourse, courseLike.selectedTrackKey);
+  const track = trackKey ? baseCourse.trackOptions[trackKey] : null;
+  if (!track) return baseCourse;
+
+  return {
+    ...baseCourse,
+    selectedTrackKey: trackKey,
+    selectedTrackLabel: track.label,
+    selectedTrackNote: track.note || "",
+    playlist: track.playlist || baseCourse.playlist,
+    modules: applyTrackToModules(baseCourse.modules, track.lessonVideoIds || {}),
+  };
 };
 
 class AppCrashBoundary extends Component {
@@ -945,7 +1020,7 @@ class AppCrashBoundary extends Component {
         <div style={{maxWidth:620,width:"100%",background:"white",borderRadius:18,padding:"28px",border:`1px solid ${C.border}`,boxShadow:C.sh}}>
           <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.6rem",color:C.emD,marginBottom:10}}>This page hit an app error</div>
           <p style={{fontSize:".9rem",lineHeight:1.7,color:C.textM,marginBottom:14}}>
-            The app now shows a safe fallback instead of staying blank. You can reload the page, or clear the browser-only demo data and start fresh.
+            The app now shows a safe fallback instead of staying blank. You can reload the page, or clear the browser-stored access data and start fresh.
           </p>
           <div style={{padding:"10px 12px",borderRadius:10,background:C.cream,border:`1px solid ${C.border}`,fontSize:".78rem",color:C.textM,marginBottom:16}}>
             {this.state.error?.message || "Unknown runtime error"}
@@ -1015,7 +1090,7 @@ const printCertificate = (course, user, completion) => {
   const logoSrc = new URL(BRAND_LOGO_SRC, window.location.href).href;
   const signatureSrc = new URL(signatureImage, window.location.href).href;
   const studentName = escapeHtml(user.name);
-  const courseTitle = escapeHtml(course.title);
+  const courseTitle = escapeHtml(course.selectedTrackLabel ? `${course.title} (${course.selectedTrackLabel} Track)` : course.title);
   const courseTitleAr = escapeHtml(course.titleAr || "");
   const completedAt = escapeHtml(formatDay(completion.completedAt));
   const certificateId = escapeHtml(completion.certificateId);
@@ -1464,26 +1539,27 @@ const StreakWidget = ({ big=false }) => {
 
 // ─── Course Card ──────────────────────────────────────────────────────────────
 const CourseCard = ({ course, onClick }) => {
+  const displayCourse = resolveCourse(course);
   const [pct, setPct] = useState(0);
   const viewerId = currentUserId();
-  const enrolled = DB.isEnrolled(course.id);
+  const enrolled = DB.isEnrolled(displayCourse.id);
   useEffect(() => {
-    const tot = totalLessons(course);
-    const dn  = DB.progress(course.id).length;
+    const tot = totalLessons(displayCourse);
+    const dn  = DB.progress(displayCourse.id).length;
     setPct(tot>0 ? Math.round(dn/tot*100) : 0);
-  }, [course.id, viewerId]);
+  }, [displayCourse.id, displayCourse.selectedTrackKey, viewerId]);
 
   return (
-    <div className="card" onClick={() => onClick(course)}
+    <div className="card" onClick={() => onClick(displayCourse)}
       style={{background:"white",borderRadius:16,overflow:"hidden",boxShadow:"0 4px 18px rgba(11,82,64,.07)",border:`1px solid ${C.border}`}}>
-      <div style={{height:148,background:`linear-gradient(135deg,${course.color},${course.color}BB)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3rem",position:"relative",overflow:"hidden"}}>
+      <div style={{height:148,background:`linear-gradient(135deg,${displayCourse.color},${displayCourse.color}BB)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3rem",position:"relative",overflow:"hidden"}}>
         <Iso op={0.1} col="white"/>
-        <span style={{position:"relative",zIndex:1,animation:"float 3s ease-in-out infinite"}}>{course.thumb}</span>
+        <span style={{position:"relative",zIndex:1,animation:"float 3s ease-in-out infinite"}}>{displayCourse.thumb}</span>
         <div style={{position:"absolute",top:10,left:10,zIndex:1}}>
-          {course.badge&&<Badge col={course.badgeC}>{course.badge}</Badge>}
+          {displayCourse.badge&&<Badge col={displayCourse.badgeC}>{displayCourse.badge}</Badge>}
         </div>
         <div style={{position:"absolute",top:10,right:10,zIndex:1}}>
-          <Badge col={course.isFree?C.em:C.gold}>{course.isFree?"Free":`$${course.price}`}</Badge>
+          <Badge col={displayCourse.isFree?C.em:C.gold}>{displayCourse.isFree?"Free":`$${displayCourse.price}`}</Badge>
         </div>
         {enrolled&&pct>0&&(
           <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",width:"82%",zIndex:1}}>
@@ -1495,21 +1571,22 @@ const CourseCard = ({ course, onClick }) => {
       </div>
       <div style={{padding:16}}>
         <div style={{display:"flex",gap:5,marginBottom:7}}>
-          <Badge col={C.emL}>{course.category}</Badge>
-          <Badge col={C.textL}>{course.level}</Badge>
+          <Badge col={C.emL}>{displayCourse.category}</Badge>
+          <Badge col={C.textL}>{displayCourse.level}</Badge>
+          {enrolled&&displayCourse.selectedTrackLabel&&<Badge col={C.gold}>{displayCourse.selectedTrackLabel}</Badge>}
         </div>
-        <h3 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.08rem",fontWeight:700,color:C.text,marginBottom:2,lineHeight:1.25}}>{course.title}</h3>
-        <p style={{fontFamily:"'Amiri',serif",fontSize:".8rem",color:C.gold,marginBottom:7}}>{course.titleAr}</p>
-        <p style={{fontSize:".78rem",color:C.textL,marginBottom:11,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{course.desc}</p>
+        <h3 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.08rem",fontWeight:700,color:C.text,marginBottom:2,lineHeight:1.25}}>{displayCourse.title}</h3>
+        <p style={{fontFamily:"'Amiri',serif",fontSize:".8rem",color:C.gold,marginBottom:7}}>{displayCourse.titleAr}</p>
+        <p style={{fontSize:".78rem",color:C.textL,marginBottom:11,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{displayCourse.desc}</p>
         <div style={{display:"flex",gap:10,fontSize:".72rem",color:C.textM,marginBottom:10}}>
-          <span>📦 {course.modules.length} modules</span>
-          <span>📚 {totalLessons(course)} lessons</span>
-          <span>👥 {course.students.toLocaleString()}</span>
+          <span>📦 {displayCourse.modules.length} modules</span>
+          <span>📚 {totalLessons(displayCourse)} lessons</span>
+          <span>👥 {displayCourse.students.toLocaleString()}</span>
         </div>
         {enrolled ? <PBar value={pct} label="Progress" thin/> : (
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <Stars n={course.rating}/>
-            <span style={{fontSize:".7rem",color:C.textL}}>{course.instructor.split(" ").pop()}</span>
+            <Stars n={displayCourse.rating}/>
+            <span style={{fontSize:".7rem",color:C.textL}}>{displayCourse.instructor.split(" ").pop()}</span>
           </div>
         )}
       </div>
@@ -1929,38 +2006,44 @@ const CoursesPage = ({ setPage, setCourse }) => {
 
 // ─── COURSE DETAIL ────────────────────────────────────────────────────────────
 const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
-  course = resolveCourse(course);
-  const [enrolled, setEnrolled] = useState(DB.isEnrolled(course?.id));
-  const [doneIds,  setDoneIds ] = useState(DB.progress(course?.id));
+  const baseCourse = resolveCourse(course);
+  const [trackKey, setTrackKey] = useState(baseCourse?.selectedTrackKey || baseCourse?.defaultTrack || null);
+  const courseView = resolveCourse({ ...baseCourse, selectedTrackKey: trackKey });
+  const [enrolled, setEnrolled] = useState(DB.isEnrolled(courseView?.id));
+  const [doneIds,  setDoneIds ] = useState(DB.progress(courseView?.id));
   const [tab,      setTab     ] = useState("modules");
   const [popped,   setPopped  ] = useState(false);
 
   useEffect(() => {
-    if (!course) return;
-    setEnrolled(DB.isEnrolled(course.id));
-    setDoneIds(DB.progress(course.id));
-  }, [course?.id]);
+    if (!baseCourse) return;
+    setTrackKey(DB.selectedTrack(baseCourse.id) || baseCourse.selectedTrackKey || baseCourse.defaultTrack || null);
+    setEnrolled(DB.isEnrolled(baseCourse.id));
+    setDoneIds(DB.progress(baseCourse.id));
+  }, [baseCourse?.id]);
 
-  const tot = course ? totalLessons(course) : 0;
+  const courseData = courseView;
+  const trackChoices = courseData?.trackOptions ? Object.entries(courseData.trackOptions) : [];
+
+  const tot = courseData ? totalLessons(courseData) : 0;
   const dn  = doneIds.length;
   const pct = tot>0 ? Math.round(dn/tot*100) : 0;
   useEffect(() => {
-    if (course && pct === 100) {
+    if (courseData && pct === 100) {
       setPage("certificate");
     }
-  }, [course, pct, setPage]);
+  }, [courseData?.id, courseData?.selectedTrackKey, pct, setPage]);
 
-  if (!course) return null;
+  if (!courseData) return null;
 
   const handleEnroll = () => {
     if (!loggedIn) { setPage("login"); return; }
-    DB.enroll(course.id); setEnrolled(true);
+    DB.enroll(courseData.id, { trackKey: courseData.selectedTrackKey }); setEnrolled(true);
     setPopped(true); setTimeout(() => setPopped(false), 2200);
   };
 
   const handleLesson = (mi, li) => {
     if (!loggedIn) { setPage("login"); return; }
-    setLesson({ course, mi, li }); setPage("lesson");
+    setLesson({ course: courseData, mi, li }); setPage("lesson");
   };
 
   const curId = null;
@@ -1968,33 +2051,73 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
   return (
     <div className="page" style={{paddingTop:64,minHeight:"100vh",background:C.cream}}>
       {/* Hero */}
-      <div style={{background:`linear-gradient(160deg,${C.emD},${course.color})`,padding:"44px 5% 34px",position:"relative",overflow:"hidden"}}>
+      <div style={{background:`linear-gradient(160deg,${C.emD},${courseData.color})`,padding:"44px 5% 34px",position:"relative",overflow:"hidden"}}>
         <Iso op={0.07} col={C.gold}/>
         <div className="split-grid" style={{maxWidth:1200,margin:"0 auto",gridTemplateColumns:"1fr auto",gap:34,alignItems:"start",position:"relative",zIndex:1}}>
           <div>
             <div style={{display:"flex",gap:6,marginBottom:12}}>
-              <Badge col={C.gold}>{course.category}</Badge>
-              <Badge col="rgba(255,255,255,.45)">{course.level}</Badge>
-              {course.isFree&&<Badge col={C.emL}>Free</Badge>}
+              <Badge col={C.gold}>{courseData.category}</Badge>
+              <Badge col="rgba(255,255,255,.45)">{courseData.level}</Badge>
+              {courseData.selectedTrackLabel&&<Badge col={C.gold}>{courseData.selectedTrackLabel} Track</Badge>}
+              {courseData.isFree&&<Badge col={C.emL}>Free</Badge>}
             </div>
-            <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.95rem",color:"white",marginBottom:4}}>{course.title}</h1>
-            <div style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".98rem",marginBottom:11}}>{course.titleAr}</div>
-            <p style={{color:"rgba(255,255,255,.7)",fontSize:".93rem",lineHeight:1.75,maxWidth:560,marginBottom:15}}>{course.desc}</p>
+            <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.95rem",color:"white",marginBottom:4}}>{courseData.title}</h1>
+            <div style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".98rem",marginBottom:11}}>{courseData.titleAr}</div>
+            <p style={{color:"rgba(255,255,255,.7)",fontSize:".93rem",lineHeight:1.75,maxWidth:560,marginBottom:15}}>{courseData.desc}</p>
             <div className="course-detail-meta" style={{display:"flex",gap:18,fontSize:".8rem",color:"rgba(255,255,255,.62)",marginBottom:15}}>
-              <span>👤 {course.instructor}</span>
-              <span>📦 {course.modules.length} modules</span>
+              <span>👤 {courseData.instructor}</span>
+              <span>📦 {courseData.modules.length} modules</span>
               <span>📚 {tot} lessons</span>
-              <span>👥 {course.students.toLocaleString()}</span>
+              <span>👥 {courseData.students.toLocaleString()}</span>
             </div>
-            <Stars n={course.rating} s={15}/>
+            <Stars n={courseData.rating} s={15}/>
             {enrolled&&<div style={{marginTop:12,maxWidth:310}}><PBar value={pct} label={`Your Progress: ${dn}/${tot} lessons`}/></div>}
           </div>
           {/* Enroll card */}
           <div className="course-detail-enroll" style={{background:"white",borderRadius:14,padding:22,minWidth:255,boxShadow:"0 14px 46px rgba(0,0,0,.2)"}}>
-            <div style={{fontSize:"2rem",textAlign:"center",marginBottom:9}}>{course.thumb}</div>
+            <div style={{fontSize:"2rem",textAlign:"center",marginBottom:9}}>{courseData.thumb}</div>
             <div style={{textAlign:"center",marginBottom:14}}>
-              <div style={{fontSize:"1.6rem",fontWeight:800,color:C.em}}>{course.isFree?"Free":`$${course.price}`}</div>
+              <div style={{fontSize:"1.6rem",fontWeight:800,color:C.em}}>{courseData.isFree?"Free":`$${courseData.price}`}</div>
             </div>
+            {trackChoices.length > 0 && (
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:".72rem",fontWeight:700,color:C.textM,letterSpacing:".06em",textTransform:"uppercase",marginBottom:8}}>Choose Language Track</div>
+                <div style={{display:"grid",gap:8}}>
+                  {trackChoices.map(([key, track]) => {
+                    const active = courseData.selectedTrackKey === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        disabled={enrolled}
+                        onClick={() => setTrackKey(key)}
+                        style={{
+                          width:"100%",
+                          textAlign:"left",
+                          padding:"10px 12px",
+                          borderRadius:10,
+                          border:`1px solid ${active ? C.em : C.border}`,
+                          background:active ? `${C.em}0D` : C.cream,
+                          cursor:enrolled ? "default" : "pointer",
+                          opacity:enrolled && !active ? 0.7 : 1,
+                        }}
+                      >
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:3}}>
+                          <span style={{fontWeight:700,color:active ? C.emD : C.text}}>{track.label}</span>
+                          {active&&<span style={{fontSize:".68rem",fontWeight:700,color:C.gold}}>{enrolled ? "Enrolled" : "Selected"}</span>}
+                        </div>
+                        <div style={{fontSize:".72rem",color:C.textL,lineHeight:1.5}}>{track.note}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{marginTop:8,fontSize:".69rem",lineHeight:1.55,color:C.textL}}>
+                  {enrolled
+                    ? `You are enrolled in the ${courseData.selectedTrackLabel} Aqidah track.`
+                    : "Choose the Aqidah language track your learners should follow before enrolling."}
+                </div>
+              </div>
+            )}
             {!enrolled ? (
               <Btn v="gold" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={handleEnroll}>
                 {loggedIn?"🎓 Enroll Now":"🔑 Login to Enroll"}
@@ -2002,17 +2125,17 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
             ) : (
               <div>
                 {popped&&<div style={{textAlign:"center",fontSize:"1.3rem",marginBottom:7,animation:"pop .4s ease"}}>🎉 Enrolled!</div>}
-                <Btn v="primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{setLesson({course,mi:0,li:0});setPage("lesson");}}>
+                <Btn v="primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{setLesson({course:courseData,mi:0,li:0});setPage("lesson");}}>
                   {dn>0?"▶ Continue":"▶ Start Course"}
                 </Btn>
                 <div style={{marginTop:9}}><PBar value={pct} label={`${pct}% complete`}/></div>
               </div>
             )}
             <div style={{marginTop:13,fontSize:".73rem",color:C.textL}}>
-              {["📦 "+course.modules.length+" modules","📚 "+tot+" lessons","📝 Personal notes","🔥 Streak tracking","📜 Certificate"].map(f=><div key={f} style={{padding:"3px 0"}}>{f}</div>)}
+              {["📦 "+courseData.modules.length+" modules","📚 "+tot+" lessons","📝 Personal notes","🔥 Streak tracking","📜 Certificate"].map(f=><div key={f} style={{padding:"3px 0"}}>{f}</div>)}
             </div>
-            {course.playlist!=="YOUR_PLAYLIST_ID_HERE"&&(
-              <a href={`https://www.youtube.com/playlist?list=${course.playlist}`} target="_blank" rel="noreferrer"
+            {courseData.playlist!=="YOUR_PLAYLIST_ID_HERE"&&(
+              <a href={`https://www.youtube.com/playlist?list=${courseData.playlist}`} target="_blank" rel="noreferrer"
                 style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:11,padding:"7px",borderRadius:8,background:"#FF000012",color:"#CC0000",fontSize:".74rem",fontWeight:600,textDecoration:"none",border:"1px solid #FF000020"}}>
                 ▶ View YouTube Playlist
               </a>
@@ -2034,19 +2157,19 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
         {tab==="modules"&&(
           <div>
             <div className="course-detail-heading" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-              <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.28rem",color:C.emD}}>{course.modules.length} Modules · {tot} Lessons</h2>
+              <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.28rem",color:C.emD}}>{courseData.modules.length} Modules · {tot} Lessons</h2>
               {enrolled&&<Badge col={C.em}>{pct}% Complete</Badge>}
             </div>
-            <ModuleList course={course} doneIds={doneIds} isEnrolled={enrolled} onLesson={handleLesson} curId={curId}/>
+            <ModuleList course={courseData} doneIds={doneIds} isEnrolled={enrolled} onLesson={handleLesson} curId={curId}/>
           </div>
         )}
         {tab==="instructor"&&(
           <div className="course-detail-instructor" style={{display:"flex",gap:20,padding:22,background:"white",borderRadius:14,border:`1px solid ${C.border}`}}>
             <div style={{width:68,height:68,borderRadius:"50%",flexShrink:0,background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:"1.3rem",fontWeight:700}}>
-              {course.instructor.split(" ").map(w=>w[0]).join("").slice(0,2)}
+              {courseData.instructor.split(" ").map(w=>w[0]).join("").slice(0,2)}
             </div>
             <div>
-              <h3 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.12rem",color:C.text}}>{course.instructor}</h3>
+              <h3 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.12rem",color:C.text}}>{courseData.instructor}</h3>
               <p style={{color:C.gold,fontSize:".8rem",marginBottom:8}}>Islamic Scholar & Course Instructor</p>
               <p style={{color:C.textM,fontSize:".83rem",lineHeight:1.7}}>A respected Islamic scholar with extensive experience in teaching the Islamic sciences. All content is based on authentic Quran and Sunnah, following the methodology of the righteous predecessors.</p>
             </div>
@@ -2055,7 +2178,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
         {tab==="resources"&&(
           <div>
             <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.28rem",color:C.emD,marginBottom:16}}>Downloadable Resources</h2>
-            {course.modules.map(mod=>{
+            {courseData.modules.map(mod=>{
               const withRes = mod.lessons.filter(l=>l.resources?.length>0);
               if (!withRes.length) return null;
               return (
@@ -2403,7 +2526,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
   useEffect(() => {
     if (!currentUser) return;
     const sync = () => {
-      setCourses(COURSES.filter(c => DB.enrolled().includes(c.id)));
+      setCourses(COURSES.filter(c => DB.enrolled().includes(c.id)).map(c => resolveCourse(c)));
       setAllProg(DB.allProgress());
       setNotes(DB.allNotes());
       setStreak(DB.streak());
@@ -2507,9 +2630,9 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
               ))}
             </div>
             <div style={{background:"white",borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:22}}>
-              <div style={{fontWeight:700,fontSize:".82rem",color:C.emD,marginBottom:4}}>GitHub Pages mode</div>
+              <div style={{fontWeight:700,fontSize:".82rem",color:C.emD,marginBottom:4}}>Browser-hosted access</div>
               <div style={{fontSize:".78rem",color:C.textL,lineHeight:1.65}}>
-                Accounts, notes, progress, streaks, and certificates are stored in this browser right now so you can launch the first version statically. When you move to Railway, this same UI can point to a real backend and database.
+                Accounts, notes, progress, streaks, and certificates are currently stored in this browser so the platform can run as a static deployment. When you connect your backend, this same UI can use real hosted authentication and database storage.
               </div>
             </div>
             <div style={{marginBottom:22}}><StreakWidget big/></div>
@@ -2534,7 +2657,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                         <div style={{width:40,height:40,borderRadius:8,background:`${c.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.15rem"}}>{c.thumb}</div>
                         <div>
                           <div style={{fontWeight:700,fontSize:".84rem"}}>{c.title}</div>
-                          <div style={{fontSize:".68rem",color:C.textL}}>{c.modules.length} modules · {tot} lessons</div>
+                          <div style={{fontSize:".68rem",color:C.textL}}>{c.modules.length} modules · {tot} lessons{c.selectedTrackLabel ? ` · ${c.selectedTrackLabel}` : ""}</div>
                         </div>
                       </div>
                       <PBar value={pct} label={`${dn}/${tot} lessons`}/>
@@ -2568,7 +2691,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                         <span style={{fontSize:"1.6rem",position:"relative",zIndex:1}}>{c.thumb}</span>
                         <div style={{position:"relative",zIndex:1,flex:1}}>
                           <div style={{color:"white",fontWeight:700,fontSize:".9rem"}}>{c.title}</div>
-                          <div style={{color:"rgba(255,255,255,.5)",fontSize:".7rem"}}>{c.instructor} · {c.modules.length} modules</div>
+                          <div style={{color:"rgba(255,255,255,.5)",fontSize:".7rem"}}>{c.instructor} · {c.modules.length} modules{c.selectedTrackLabel ? ` · ${c.selectedTrackLabel}` : ""}</div>
                         </div>
                         {pct===100&&<div style={{position:"relative",zIndex:1}}><Badge col="white">✅ Complete</Badge></div>}
                       </div>
@@ -2693,11 +2816,12 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                   </div>
                 </div>
                   <div style={{padding:"20px 34px",textAlign:"center",background:C.cream}}>
-                    <div style={{borderTop:`2px solid ${C.gold}28`,borderBottom:`2px solid ${C.gold}28`,padding:"14px 0",margin:"0 0 14px"}}>
+                  <div style={{borderTop:`2px solid ${C.gold}28`,borderBottom:`2px solid ${C.gold}28`,padding:"14px 0",margin:"0 0 14px"}}>
                       <div style={{color:C.textL,fontSize:".78rem",marginBottom:5}}>This certifies that</div>
                     <div style={{fontFamily:"'Amiri',serif",fontSize:"1.35rem",color:C.emD,fontWeight:700}}>{currentUser.name}</div>
                     <div style={{color:C.textL,fontSize:".78rem",margin:"5px 0"}}>has successfully completed</div>
                     <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.08rem",color:C.gold,fontWeight:700}}>{c.title}</div>
+                    {c.selectedTrackLabel&&<div style={{fontSize:".74rem",color:C.textL,marginTop:4}}>{c.selectedTrackLabel} Track</div>}
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:".7rem",color:C.textL}}>
                       <span>📅 {formatDay(completion.completedAt)}</span>
@@ -2726,7 +2850,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                 <div>
                   <div style={{fontWeight:700,fontSize:".98rem"}}>{currentUser.name}</div>
                   <div style={{color:C.textL,fontSize:".78rem"}}>Student since {formatDay(currentUser.joinedAt || dayKey(), { year:"numeric", month:"short" })}</div>
-                  <div style={{marginTop:6,fontSize:".72rem",color:C.textL}}>Stored locally in this browser until your Railway backend is connected.</div>
+                  <div style={{marginTop:6,fontSize:".72rem",color:C.textL}}>Stored in this browser for now until your hosted backend is connected.</div>
                 </div>
               </div>
               {[["Full Name","name"],["Email","email"],["Country","country"],["Language","language"]].map(([l,key])=>(
@@ -2776,12 +2900,12 @@ const LoginPage = ({ setPage, onLogin }) => {
           <div style={{width:46,height:46,borderRadius:11,background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 9px"}}>
             <svg width="23" height="23" viewBox="0 0 22 22"><polygon points="11,2 13,8 19,8 14,12 16,18 11,14 6,18 8,12 3,8 9,8" fill="white"/></svg>
           </div>
-          <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.45rem",color:C.emD}}>Welcome Back</h1>
-          <p style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".88rem"}}>أهلاً وسهلاً</p>
+          <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.45rem",color:C.emD}}>Secure Sign In</h1>
+          <p style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".88rem"}}>دخول آمن للمتعلمين والإدارة</p>
         </div>
         <Divider/>
         <div style={{marginTop:18}}>
-          {[["Email","email","student@you.com","📧"],["Password","password","Minimum 8 characters","🔒"]].map(([label,type,placeholder,icon])=>(
+          {[["Email","email","you@example.com","📧"],["Password","password","Enter your password","🔒"]].map(([label,type,placeholder,icon])=>(
             <div key={label} style={{marginBottom:13}}>
               <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
               <div style={{position:"relative"}}>
@@ -2798,15 +2922,14 @@ const LoginPage = ({ setPage, onLogin }) => {
             {loading?<><div style={{width:15,height:15,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"white",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>Signing in…</>:"Sign In →"}
           </button>
           <p style={{textAlign:"center",marginTop:14,fontSize:".78rem",color:C.textL}}>
-            No account? <span onClick={()=>setPage("register")} style={{color:C.em,fontWeight:600,cursor:"pointer"}}>Join Free</span>
+            Need learner access? <span onClick={()=>setPage("register")} style={{color:C.em,fontWeight:600,cursor:"pointer"}}>Create Account</span>
           </p>
           <div style={{marginTop:11,padding:"10px 12px",background:`${C.gold}0E`,borderRadius:8,border:`1px solid ${C.gold}22`}}>
-            <div style={{fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:5}}>Local demo accounts</div>
+            <div style={{fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:5}}>Private role-based access</div>
             <div style={{fontSize:".72rem",color:C.textM,lineHeight:1.65}}>
-              Student: <strong>{DEMO_STUDENT_EMAIL}</strong> / <strong>{DEMO_STUDENT_PASSWORD}</strong><br/>
-              Admin: <strong>{DEMO_ADMIN_EMAIL}</strong> / <strong>{DEMO_ADMIN_PASSWORD}</strong>
+              Administrators sign in with assigned credentials. Learners can create an account to access their dashboard, progress, notes, and certificates.
             </div>
-            <div style={{fontSize:".68rem",color:C.textL,marginTop:6}}>These accounts live only in this browser while the site is hosted statically.</div>
+            <div style={{fontSize:".68rem",color:C.textL,marginTop:6}}>Access data is currently stored in this browser until your hosted backend is connected.</div>
           </div>
         </div>
       </div>
@@ -2851,8 +2974,8 @@ const RegisterPage = ({ setPage, onRegister }) => {
       <Iso op={0.06} col={C.gold}/>
       <div className="auth-card" style={{background:"white",borderRadius:20,padding:38,maxWidth:430,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
         <div style={{textAlign:"center",marginBottom:20}}>
-          <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.45rem",color:C.emD}}>Join Nur Academy</h1>
-          <p style={{fontFamily:"'Amiri',serif",color:C.gold}}>انضم إلى نور أكاديمي</p>
+          <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.45rem",color:C.emD}}>Create Learner Account</h1>
+          <p style={{fontFamily:"'Amiri',serif",color:C.gold}}>إنشاء حساب طالب</p>
         </div>
         <Divider/>
         <div style={{marginTop:18}}>
@@ -2866,7 +2989,7 @@ const RegisterPage = ({ setPage, onRegister }) => {
               </div>
             ))}
           </div>
-          {[["Email","email","student@you.com"],["Password","password","Minimum 8 characters"]].map(([label,key,placeholder])=>(
+          {[["Email","email","you@example.com"],["Password","password","Minimum 8 characters"]].map(([label,key,placeholder])=>(
             <div key={label} style={{marginBottom:11}}>
               <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
               <input type={key==="password"?"password":"email"} value={form[key]} onChange={e=>setForm(prev => ({ ...prev, [key]: e.target.value }))}
@@ -2887,7 +3010,7 @@ const RegisterPage = ({ setPage, onRegister }) => {
             Already have an account? <span onClick={()=>setPage("login")} style={{color:C.em,fontWeight:600,cursor:"pointer"}}>Sign In</span>
           </p>
           <div style={{marginTop:11,padding:"8px 12px",background:`${C.gold}0E`,borderRadius:8,border:`1px solid ${C.gold}22`,textAlign:"center"}}>
-            <div style={{fontSize:".68rem",color:C.textM}}>Accounts created on GitHub Pages stay in this browser until you move auth to Railway.</div>
+            <div style={{fontSize:".68rem",color:C.textM}}>Learner accounts are stored in this browser for now until your hosted authentication system is connected.</div>
           </div>
         </div>
       </div>
@@ -2988,7 +3111,7 @@ const AdminPage = ({ setPage, currentUser }) => {
         <div style={{maxWidth:460,background:"white",borderRadius:16,padding:28,border:`1px solid ${C.border}`,boxShadow:C.sh,textAlign:"center"}}>
           <div style={{fontSize:"2.2rem",marginBottom:11}}>🔒</div>
           <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.35rem",color:C.emD,marginBottom:8}}>Admin Access Required</h1>
-          <p style={{fontSize:".84rem",color:C.textL,lineHeight:1.7,marginBottom:16}}>The admin panel is now limited to signed-in admin accounts only. Use the seeded admin login or connect real role-based auth when you move to Railway.</p>
+          <p style={{fontSize:".84rem",color:C.textL,lineHeight:1.7,marginBottom:16}}>The admin panel is available only to authenticated administrator accounts. Sign in with your assigned admin credentials or connect a hosted auth provider when you move to Railway.</p>
           <Btn v="primary" onClick={()=>setPage("dashboard")}>Return to Dashboard</Btn>
         </div>
       </div>
@@ -3134,7 +3257,8 @@ export default function App() {
     setLesson(null);
     setPage("home");
   };
-  const certificateCompletion = course ? DB.courseCompletion(course.id) : null;
+  const activeCourse = course ? resolveCourse(course) : null;
+  const certificateCompletion = activeCourse ? DB.courseCompletion(activeCourse.id) : null;
 
   const noNav    = ["lesson"].includes(page);
   const noFooter = ["lesson","dashboard","admin","login","register"].includes(page);
@@ -3168,11 +3292,11 @@ export default function App() {
         {page==="certificate" && (
           <CertificatePage
             user={currentUser}
-            course={course}
+            course={activeCourse}
             completion={certificateCompletion}
             onPrint={() => {
-              if (course && currentUser && certificateCompletion) {
-                printCertificate(course, currentUser, certificateCompletion);
+              if (activeCourse && currentUser && certificateCompletion) {
+                printCertificate(activeCourse, currentUser, certificateCompletion);
               }
             }}
           />
