@@ -1,5 +1,6 @@
 import CertificatePage from "./components/CertificatePage";
 import { Component, useState, useEffect, useRef, useCallback } from "react";
+import signatureImage from "./assets/signature-optimized.png";
 import { LISANUL_QURAN_PLAYLIST_ID, LISANUL_QURAN_PLAYLIST_ITEMS } from "./data/lisanulQuranPlaylist";
 import { MUALIM_UL_QURAN_PLAYLIST_ID, MUALIM_UL_QURAN_PLAYLIST_ITEMS } from "./data/mualimUlQuranPlaylist";
 import { NOORANI_QAIDA_PLAYLIST_ID, NOORANI_QAIDA_PLAYLIST_ITEMS } from "./data/nooraniQaidaPlaylist";
@@ -143,6 +144,7 @@ const DEMO_STUDENT_PASSWORD = "NurStudent123!";
 const WATCH_COMPLETE_THRESHOLD = 90;
 const WATCH_TICK_MS = 1000;
 const YT_API_SRC = "https://www.youtube.com/iframe_api";
+const BRAND_LOGO_SRC = `${import.meta.env.BASE_URL}favicon.png`;
 
 const ls = {
   get: (k, fb) => { try { return JSON.parse(localStorage.getItem(k)) ?? fb; } catch { return fb; } },
@@ -184,6 +186,12 @@ const formatDay = (value, opts={ year:"numeric", month:"long", day:"numeric" }) 
   const date = parseDayKey(value);
   return date ? date.toLocaleDateString("en-US", opts) : "—";
 };
+const escapeHtml = (value="") => String(value)
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#39;");
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const chunk = (items, size) => {
   const groups = [];
@@ -1004,43 +1012,142 @@ const printCertificate = (course, user, completion) => {
   if (typeof window === "undefined" || !course || !user || !completion) return;
   const popup = window.open("", "_blank", "noopener,noreferrer,width=1100,height=780");
   if (!popup) return;
+  const logoSrc = new URL(BRAND_LOGO_SRC, window.location.href).href;
+  const signatureSrc = new URL(signatureImage, window.location.href).href;
+  const studentName = escapeHtml(user.name);
+  const courseTitle = escapeHtml(course.title);
+  const courseTitleAr = escapeHtml(course.titleAr || "");
+  const completedAt = escapeHtml(formatDay(completion.completedAt));
+  const certificateId = escapeHtml(completion.certificateId);
 
   popup.document.write(`<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>${course.title} Certificate</title>
+    <title>${courseTitle} Certificate</title>
     <style>
-      body{margin:0;background:#f5efe2;font-family:Georgia,serif;color:#1a1a1a}
-      .page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
-      .cert{width:960px;background:linear-gradient(180deg,#fffdf7 0%,#f7f0df 100%);border:14px solid #0b5240;box-shadow:0 18px 60px rgba(11,82,64,.16)}
-      .head{padding:34px 48px;background:linear-gradient(135deg,#073729,#0b5240);color:#fff;text-align:center}
-      .brand{font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:#e8c46a}
-      .title{font-size:42px;font-weight:700;margin-top:10px}
-      .body{padding:44px 60px;text-align:center}
-      .arabic{font-size:26px;color:#c9a84c;margin-bottom:10px}
-      .lead{font-size:18px;color:#666}
-      .name{font-size:40px;font-weight:700;color:#073729;margin:24px 0 10px}
-      .course{font-size:28px;font-weight:700;color:#c9a84c;margin-bottom:24px}
-      .meta{display:flex;justify-content:space-between;gap:20px;border-top:2px solid rgba(201,168,76,.35);padding-top:22px;font-size:15px;color:#555}
+      @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Crimson+Pro:wght@600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Crimson+Pro:wght@600;700&display=swap');
+      @page{size:landscape;margin:10mm}
+      *{box-sizing:border-box}
+      body{margin:0;background:radial-gradient(circle at top,#f3e9cf,#eadcbf 58%,#dfcfad 100%);font-family:Georgia,serif;color:#1a1a1a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:0}
+      .cert{position:relative;width:100%;max-width:277mm;min-height:184mm;background:linear-gradient(180deg,#fffdf6 0%,#f7ecd2 100%);border:1px solid rgba(18,79,58,.18);box-shadow:0 28px 80px rgba(78,54,15,.14);overflow:hidden;break-inside:avoid;page-break-inside:avoid}
+      .cert::before,.cert::after{content:"";position:absolute;inset:18px;border:2px solid rgba(186,145,53,.52);pointer-events:none}
+      .cert::after{inset:34px;border-width:1px;border-color:rgba(18,79,58,.14)}
+      .corner{position:absolute;width:118px;height:118px;border:2px solid rgba(186,145,53,.52);opacity:.78;z-index:1}
+      .corner.tl{top:20px;left:20px;border-right:none;border-bottom:none}
+      .corner.tr{top:20px;right:20px;border-left:none;border-bottom:none}
+      .corner.bl{bottom:20px;left:20px;border-right:none;border-top:none}
+      .corner.br{bottom:20px;right:20px;border-left:none;border-top:none}
+      .content{position:relative;padding:13mm 16mm 11mm;z-index:2}
+      .bismillah{text-align:center;color:#0c8a61;font-size:19px;letter-spacing:.04em;margin-bottom:10px;font-family:"Amiri",Georgia,serif}
+      .brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px}
+      .brand-mark{width:60px;height:60px;border-radius:50%;background:#fffdf7;border:3px solid rgba(186,145,53,.55);box-shadow:0 10px 24px rgba(18,79,58,.12);padding:6px;display:flex;align-items:center;justify-content:center}
+      .brand-mark img{width:100%;height:100%;object-fit:contain}
+      .brand-copy{text-align:center}
+      .brand-copy span{display:block;color:#9a7420;letter-spacing:.22em;text-transform:uppercase;font-size:10px;font-weight:700}
+      .brand-copy strong{display:block;color:#0b5240;font-size:22px;margin-top:4px;font-family:"Amiri",Georgia,serif}
+      .title-ar{text-align:center;font-size:26px;color:#0b5240;font-family:"Amiri",Georgia,serif;margin-top:8px}
+      .title{text-align:center;font-size:34px;color:#493616;margin:2px 0 0;font-family:"Crimson Pro",Georgia,serif;font-weight:700;line-height:1.08}
+      .divider{display:flex;align-items:center;justify-content:center;gap:10px;color:#b58d33;margin:10px 0 14px;font-size:12px;letter-spacing:.3em}
+      .divider::before,.divider::after{content:"";width:60px;height:1px;background:linear-gradient(90deg,transparent,rgba(181,141,51,.75),transparent)}
+      .lead{text-align:center;color:#5a564d;font-size:13px;line-height:1.55;max-width:760px;margin:0 auto}
+      .label{text-align:center;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#9a7420;margin-top:18px;font-weight:700}
+      .student-name{text-align:center;font-size:40px;line-height:1.04;color:#0b5240;font-weight:700;margin:8px 0 6px;font-family:"Crimson Pro",Georgia,serif}
+      .student-line{width:280px;max-width:70%;height:2px;background:linear-gradient(90deg,transparent,rgba(181,141,51,.92),transparent);margin:0 auto 12px}
+      .course-name{text-align:center;font-size:25px;line-height:1.28;color:#473721;font-weight:700;max-width:760px;margin:8px auto 0;font-family:"Crimson Pro",Georgia,serif}
+      .course-ar{text-align:center;font-size:16px;color:#0c8a61;margin-top:6px;font-family:"Amiri",Georgia,serif}
+      .quote{margin:16px auto 0;max-width:620px;padding:10px 14px;border-top:1px solid rgba(181,141,51,.45);border-bottom:1px solid rgba(181,141,51,.45);text-align:center;background:rgba(255,250,240,.52)}
+      .quote-ar{color:#0b5240;font-size:18px;font-family:"Amiri",Georgia,serif;margin-bottom:4px}
+      .quote-en{color:#736b5f;font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+      .meta-row{margin-top:18px;display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center}
+      .meta-card{background:rgba(255,255,255,.76);border:1px solid rgba(18,79,58,.12);padding:12px 14px;min-height:84px;text-align:center}
+      .meta-card span{display:block;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#9a7420;margin-bottom:6px;font-weight:700}
+      .meta-card strong{display:block;font-size:16px;color:#0b5240;line-height:1.45;word-break:break-word}
+      .seal{width:112px;height:112px;border-radius:50%;border:2px solid rgba(181,141,51,.8);background:radial-gradient(circle,#fff8e2 0%,#ecd28f 48%,#c59c2e 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 14px 28px rgba(92,66,16,.18)}
+      .seal-inner{width:86px;height:86px;border-radius:50%;border:2px solid rgba(255,255,255,.65);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#533707;padding:8px}
+      .seal-inner span,.seal-inner small{text-transform:uppercase;letter-spacing:.16em;font-size:8px;line-height:1.4}
+      .seal-inner strong{font-size:16px;margin:4px 0;line-height:1.05}
+      .footer{margin-top:18px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end}
+      .signature-block{max-width:320px}
+      .signature-block img{height:42px;object-fit:contain;display:block;margin-bottom:6px}
+      .signature-line{height:1px;background:#0b5240}
+      .signature-label{margin-top:6px;color:#5e584b;font-size:10px;text-transform:uppercase;letter-spacing:.18em}
+      .foot-copy{text-align:right;color:#645d52;font-size:10px;line-height:1.55;max-width:240px}
+      .foot-copy strong{display:block;color:#0b5240;font-size:14px;margin-bottom:4px}
+      @media (max-width: 900px){
+        .content{padding:42px 34px 34px}
+        .brand{flex-direction:column;gap:12px}
+        .title{font-size:38px}
+        .title-ar{font-size:30px}
+        .student-name{font-size:42px}
+        .course-name{font-size:28px}
+        .meta-row{grid-template-columns:1fr;justify-items:center}
+        .meta-card{width:100%;max-width:520px;text-align:center}
+        .footer{grid-template-columns:1fr;gap:22px}
+        .signature-block{max-width:none}
+        .foot-copy{text-align:left}
+      }
     </style>
   </head>
   <body>
     <div class="page">
       <div class="cert">
-        <div class="head">
-          <div class="brand">Nur Academy · نور أكاديمي</div>
-          <div class="title">Certificate of Completion</div>
-        </div>
-        <div class="body">
-          <div class="arabic">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</div>
-          <div class="lead">This certifies that</div>
-          <div class="name">${user.name}</div>
-          <div class="lead">has successfully completed</div>
-          <div class="course">${course.title}</div>
-          <div class="meta">
-            <span>Issued: ${formatDay(completion.completedAt)}</span>
-            <span>Certificate ID: ${completion.certificateId}</span>
+        <span class="corner tl"></span>
+        <span class="corner tr"></span>
+        <span class="corner bl"></span>
+        <span class="corner br"></span>
+        <div class="content">
+          <div class="bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+          <div class="brand">
+            <div class="brand-mark"><img src="${logoSrc}" alt="Nur Academy logo" /></div>
+            <div class="brand-copy">
+              <span>Nur Academy</span>
+              <strong>نور أكاديمي</strong>
+            </div>
+          </div>
+          <div class="title-ar">شهادة إتمام</div>
+          <h1 class="title">Certificate of Completion</h1>
+          <div class="divider">✦ ✦ ✦</div>
+          <div class="lead">With gratitude and recognition for sincere effort in seeking beneficial knowledge, this certificate is presented in honor of successful completion.</div>
+          <div class="label">Presented To</div>
+          <div class="student-name">${studentName}</div>
+          <div class="student-line"></div>
+          <div class="label">For Successfully Completing</div>
+          <div class="course-name">${courseTitle}</div>
+          ${courseTitleAr ? `<div class="course-ar">${courseTitleAr}</div>` : ""}
+          <div class="quote">
+            <div class="quote-ar">وَقُل رَّبِّ زِدْنِي عِلْمًا</div>
+            <div class="quote-en">"My Lord, increase me in knowledge."</div>
+          </div>
+          <div class="meta-row">
+            <div class="meta-card">
+              <span>Completion Date</span>
+              <strong>${completedAt}</strong>
+            </div>
+            <div class="seal">
+              <div class="seal-inner">
+                <span>Traditional</span>
+                <strong>Ijazah</strong>
+                <small>Inspired Presentation</small>
+              </div>
+            </div>
+            <div class="meta-card">
+              <span>Certificate ID</span>
+              <strong>${certificateId}</strong>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="signature-block">
+              <img src="${signatureSrc}" alt="Instructor signature" />
+              <div class="signature-line"></div>
+              <div class="signature-label">Authorized Instructor</div>
+            </div>
+            <div class="foot-copy">
+              <strong>Issued by Nur Academy</strong>
+              May this completion be a source of barakah, growth, and beneficial knowledge.
+            </div>
           </div>
         </div>
       </div>
@@ -3027,6 +3134,7 @@ export default function App() {
     setLesson(null);
     setPage("home");
   };
+  const certificateCompletion = course ? DB.courseCompletion(course.id) : null;
 
   const noNav    = ["lesson"].includes(page);
   const noFooter = ["lesson","dashboard","admin","login","register"].includes(page);
@@ -3061,6 +3169,12 @@ export default function App() {
           <CertificatePage
             user={currentUser}
             course={course}
+            completion={certificateCompletion}
+            onPrint={() => {
+              if (course && currentUser && certificateCompletion) {
+                printCertificate(course, currentUser, certificateCompletion);
+              }
+            }}
           />
         )}
         {!noFooter&&<Footer/>}
