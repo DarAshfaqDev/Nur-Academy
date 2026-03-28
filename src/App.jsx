@@ -1,3 +1,4 @@
+import CertificatePage from "./components/CertificatePage";
 import { Component, useState, useEffect, useRef, useCallback } from "react";
 import { LISANUL_QURAN_PLAYLIST_ID, LISANUL_QURAN_PLAYLIST_ITEMS } from "./data/lisanulQuranPlaylist";
 import { MUALIM_UL_QURAN_PLAYLIST_ID, MUALIM_UL_QURAN_PLAYLIST_ITEMS } from "./data/mualimUlQuranPlaylist";
@@ -58,8 +59,19 @@ const injectCSS = () => {
     .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
     .btn:active{transform:translateY(0)}
     .btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;filter:none!important}
+    button{font:inherit}
     .navL{transition:color .2s;cursor:pointer}
     .navL:hover{color:${C.gold}!important}
+    .nav-shell{position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px;height:64px}
+    .nav-toggle{display:none;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;border:1px solid transparent;background:transparent;cursor:pointer;transition:all .2s}
+    .nav-panel{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:1}
+    .nav-links{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+    .nav-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+    .footer-grid,.grid-4,.grid-3,.grid-2,.split-grid{display:grid}
+    .footer-bottom{display:flex;justify-content:space-between;gap:14px}
+    .tabs-scroll{overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+    .tabs-scroll::-webkit-scrollbar{display:none}
+    .table-wrap{overflow:auto}
     .sL{display:flex;align-items:center;gap:9px;padding:9px 13px;border-radius:10px;cursor:pointer;transition:all .2s;font-weight:500;font-size:.86rem;color:${C.textM}}
     .sL:hover{background:rgba(11,82,64,.08);color:${C.em}}
     .sL.on{background:${C.em};color:#fff}
@@ -79,6 +91,46 @@ const injectCSS = () => {
     th{padding:10px 14px;text-align:left;font-size:.7rem;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #E5E7EB}
     td{padding:12px 14px;border-bottom:1px solid #F3F4F6;font-size:.83rem;vertical-align:middle}
     tr:last-child td{border-bottom:none}
+
+    @media (max-width:1100px){
+      .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      .split-grid{grid-template-columns:1fr!important}
+      .dashboard-shell,.admin-shell{display:block!important}
+      .dashboard-sidebar,.admin-sidebar{position:static!important;width:auto!important;top:auto!important;bottom:auto!important;overflow:visible!important;max-height:none!important}
+      .dashboard-content,.admin-content{margin-left:0!important;padding:20px 20px 28px!important}
+      .dashboard-sidebar{border-right:none!important;border-bottom:1px solid ${C.border}!important}
+      .admin-sidebar{border-bottom:1px solid rgba(255,255,255,.12)!important}
+      .lesson-main{flex-direction:column!important;overflow:visible!important}
+      .lesson-content{overflow:visible!important}
+      .lesson-sidebar{width:100%!important;border-left:none!important;border-top:1px solid rgba(255,255,255,.06)!important}
+      .home-stat-row,.course-detail-meta,.course-detail-heading,.dashboard-cert-footer,.admin-header,.profile-head{flex-wrap:wrap!important}
+      .dashboard-highlight-grid{grid-template-columns:1fr!important}
+    }
+
+    @media (max-width:768px){
+      .nav-shell{height:auto!important;min-height:64px!important;padding:12px 0!important}
+      .nav-toggle{display:inline-flex!important}
+      .nav-panel{display:none!important;position:absolute;top:calc(100% + 10px);left:0;right:0;flex-direction:column;align-items:stretch;gap:12px;padding:14px;background:rgba(255,255,255,.98);border:1px solid ${C.border};border-radius:18px;box-shadow:${C.sh}}
+      .nav-panel.open{display:flex!important}
+      .nav-links,.nav-actions{width:100%;flex-direction:column;align-items:stretch!important}
+      .navL{text-align:center}
+      .nav-actions .btn{width:100%;justify-content:center}
+      .nav-avatar{width:100%!important;height:auto!important;border-radius:12px!important;padding:10px 14px!important}
+      .footer-grid,.grid-4,.grid-3,.grid-2{grid-template-columns:1fr!important}
+      .footer-bottom,.course-detail-heading,.course-detail-meta,.course-detail-instructor,.lesson-topbar,.lesson-actions,.dashboard-cert-footer,.profile-head,.admin-header{flex-direction:column!important;align-items:flex-start!important}
+      .home-stat-row{gap:14px!important}
+      .lesson-progress{width:100%!important}
+      .lesson-spacer{display:none!important}
+      .dashboard-content,.admin-content{padding:18px 14px 24px!important}
+      .dashboard-sidebar,.admin-sidebar{padding:14px 12px!important}
+      .auth-card{padding:28px 22px!important}
+      .auth-name-grid{grid-template-columns:1fr!important}
+      .action-row{width:100%;flex-direction:column!important}
+      .action-row .btn{width:100%;justify-content:center}
+      .table-wrap table{min-width:680px}
+      .course-detail-enroll{width:100%!important}
+    }
   `;
   document.head.appendChild(s);
 };
@@ -1453,6 +1505,7 @@ const NotesEditor = ({ lessonId }) => {
 const Navbar = ({ page, setPage, currentUser, onSignOut }) => {
   const [scrolled, setScrolled] = useState(false);
   const [streak, setStreak] = useState(currentUser ? DB.streak().count || 0 : 0);
+  const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY>20);
     window.addEventListener("scroll", fn);
@@ -1464,13 +1517,25 @@ const Navbar = ({ page, setPage, currentUser, onSignOut }) => {
     window.addEventListener("nur:data", sync);
     return () => window.removeEventListener("nur:data", sync);
   }, [page, currentUser?.id]);
+  useEffect(() => { setMobileOpen(false); }, [page, currentUser?.id]);
+  useEffect(() => {
+    const closeDesktopMenu = () => {
+      if (window.innerWidth > 768) setMobileOpen(false);
+    };
+    window.addEventListener("resize", closeDesktopMenu);
+    return () => window.removeEventListener("resize", closeDesktopMenu);
+  }, []);
 
   const hero = ["home","login","register"].includes(page);
-  const dark = scrolled || !hero;
+  const dark = scrolled || !hero || mobileOpen;
+  const openPage = (nextPage) => {
+    setPage(nextPage);
+    setMobileOpen(false);
+  };
 
   return (
     <nav style={{position:"fixed",top:0,left:0,right:0,zIndex:100,background:dark?"rgba(255,255,255,.97)":"transparent",backdropFilter:dark?"blur(14px)":"none",borderBottom:dark?`1px solid ${C.border}`:"none",transition:"all .3s",padding:"0 5%"}}>
-      <div style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:64}}>
+      <div className="nav-shell" style={{maxWidth:1200,margin:"0 auto"}}>
         <div onClick={() => setPage("home")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:9}}>
           <div style={{width:36,height:36,borderRadius:8,background:`linear-gradient(135deg,${C.em},${C.emM})`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 3px 10px rgba(11,82,64,.28)"}}>
             <svg width="19" height="19" viewBox="0 0 22 22"><polygon points="11,2 13,8 19,8 14,12 16,18 11,14 6,18 8,12 3,8 9,8" fill="#C9A84C"/></svg>
@@ -1480,26 +1545,38 @@ const Navbar = ({ page, setPage, currentUser, onSignOut }) => {
             <div style={{fontFamily:"'Amiri',serif",fontSize:".62rem",color:C.gold,lineHeight:1}}>نور أكاديمي</div>
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:3}}>
+        <button
+          type="button"
+          className="nav-toggle"
+          onClick={() => setMobileOpen(open => !open)}
+          aria-label="Toggle navigation"
+          aria-expanded={mobileOpen}
+          style={{color:dark?C.emD:"white",borderColor:dark?`${C.em}22`:"rgba(255,255,255,.26)",background:dark?"rgba(11,82,64,.06)":"rgba(255,255,255,.1)"}}
+        >
+          {mobileOpen ? "✕" : "☰"}
+        </button>
+        <div className={`nav-panel${mobileOpen ? " open" : ""}`}>
+          <div className="nav-links">
           {[["Home","home"],["Courses","courses"],["About","about"],["Contact","contact"]].map(([l,k])=>(
-            <span key={k} className="navL" onClick={()=>setPage(k)}
+            <span key={k} className="navL" onClick={()=>openPage(k)}
               style={{padding:"6px 13px",borderRadius:7,fontWeight:600,fontSize:".83rem",color:page===k?C.gold:dark?C.textM:"rgba(255,255,255,.85)",background:page===k?`${C.gold}12`:"transparent"}}>{l}</span>
           ))}
+          </div>
           {currentUser ? (
-            <div style={{display:"flex",alignItems:"center",gap:7,marginLeft:6}}>
-              {streak>0&&<StreakWidget/>}
-              <Btn size="sm" v="ghost" onClick={()=>setPage("dashboard")}>Dashboard</Btn>
-              {currentUser.role==="admin"&&<Btn size="sm" v="ghost" onClick={()=>setPage("admin")}>Admin</Btn>}
-              <div onClick={()=>setPage("dashboard")} title={currentUser.name}
-                style={{width:32,height:32,borderRadius:"50%",background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontWeight:700,fontSize:".8rem",cursor:"pointer"}}>
+            <div className="nav-actions" style={{marginLeft:6}}>
+              {streak>0&&<div style={{display:"flex",justifyContent:"center"}}><StreakWidget/></div>}
+              <Btn size="sm" v="ghost" onClick={()=>openPage("dashboard")}>Dashboard</Btn>
+              {currentUser.role==="admin"&&<Btn size="sm" v="ghost" onClick={()=>openPage("admin")}>Admin</Btn>}
+              <div className="nav-avatar" onClick={()=>openPage("dashboard")} title={currentUser.name}
+                style={{width:32,height:32,borderRadius:"50%",background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontWeight:700,fontSize:".8rem",cursor:"pointer",flexShrink:0}}>
                 {getInitials(currentUser.name)}
               </div>
-              <Btn size="sm" v="outline" onClick={onSignOut} style={{color:dark?C.em:"white",borderColor:dark?C.em:"rgba(255,255,255,.45)"}}>Sign Out</Btn>
+              <Btn size="sm" v="outline" onClick={()=>{ setMobileOpen(false); onSignOut(); }} style={{color:dark?C.em:"white",borderColor:dark?C.em:"rgba(255,255,255,.45)"}}>Sign Out</Btn>
             </div>
           ) : (
-            <div style={{display:"flex",gap:7,marginLeft:6}}>
-              <Btn size="sm" v="outline" onClick={()=>setPage("login")} style={{color:dark?C.em:"white",borderColor:dark?C.em:"rgba(255,255,255,.45)"}}>Login</Btn>
-              <Btn size="sm" v="gold" onClick={()=>setPage("register")}>Join Free</Btn>
+            <div className="nav-actions" style={{marginLeft:6}}>
+              <Btn size="sm" v="outline" onClick={()=>openPage("login")} style={{color:dark?C.em:"white",borderColor:dark?C.em:"rgba(255,255,255,.45)"}}>Login</Btn>
+              <Btn size="sm" v="gold" onClick={()=>openPage("register")}>Join Free</Btn>
             </div>
           )}
         </div>
@@ -1513,7 +1590,7 @@ const Footer = () => (
   <footer style={{background:C.emD,color:"rgba(255,255,255,.7)",padding:"48px 5% 24px",position:"relative",overflow:"hidden"}}>
     <Iso op={0.04} col={C.gold}/>
     <div style={{maxWidth:1200,margin:"0 auto",position:"relative",zIndex:1}}>
-      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:34,marginBottom:32}}>
+      <div className="footer-grid grid-4" style={{gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:34,marginBottom:32}}>
         <div>
           <div style={{fontFamily:"'Amiri',serif",fontSize:"1.2rem",color:"white",marginBottom:2}}>Nur Academy</div>
           <div style={{fontFamily:"'Amiri',serif",color:C.gold,marginBottom:11,fontSize:".88rem"}}>نور أكاديمي</div>
@@ -1537,7 +1614,7 @@ const Footer = () => (
         ))}
       </div>
       <Divider col={C.gold}/>
-      <div style={{display:"flex",justifyContent:"space-between",paddingTop:14,fontSize:".72rem",color:"rgba(255,255,255,.3)"}}>
+      <div className="footer-bottom" style={{paddingTop:14,fontSize:".72rem",color:"rgba(255,255,255,.3)"}}>
         <span>© {new Date().getFullYear()} Nur Academy — جميع الحقوق محفوظة</span>
         <span>Made with ❤️ for the Muslim Ummah</span>
       </div>
@@ -1565,7 +1642,7 @@ const HomePage = ({ setPage, setCourse }) => {
       <section style={{minHeight:"100vh",background:`linear-gradient(160deg,${C.emD} 0%,${C.em} 55%,${C.emM} 100%)`,display:"flex",alignItems:"center",padding:"92px 5% 52px",position:"relative",overflow:"hidden"}}>
         <Iso op={0.07} col={C.gold}/>
         <div style={{position:"absolute",top:-100,right:-100,width:480,height:480,borderRadius:"50%",background:"rgba(201,168,76,.05)",border:"1px solid rgba(201,168,76,.1)"}}/>
-        <div style={{maxWidth:1200,margin:"0 auto",width:"100%",display:"grid",gridTemplateColumns:"1fr 1fr",gap:52,alignItems:"center"}}>
+        <div className="split-grid" style={{maxWidth:1200,margin:"0 auto",width:"100%",gridTemplateColumns:"1fr 1fr",gap:52,alignItems:"center"}}>
           <div>
             <div style={{textAlign:"center",marginBottom:4}}>
               <div style={{fontFamily:"'Amiri',serif",fontSize:"1.3rem",color:C.gold,letterSpacing:2}}>بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</div>
@@ -1583,7 +1660,7 @@ const HomePage = ({ setPage, setCourse }) => {
               <Btn size="lg" v="gold" onClick={()=>setPage("courses")} icon="📚">Browse Courses</Btn>
               <Btn size="lg" onClick={()=>setPage("register")} style={{background:"rgba(255,255,255,.1)",color:"white",border:"1px solid rgba(255,255,255,.3)",borderRadius:10}}>Join Free Today</Btn>
             </div>
-            <div style={{display:"flex",gap:28}}>
+            <div className="home-stat-row" style={{display:"flex",gap:28}}>
               {[{v:`${COURSES.filter(c=>c.isFree).length}`,l:"Free Courses"},{v:String(COURSES.length),l:"Total Courses"},{v:String(COURSES.reduce((a,c)=>a+c.modules.length,0)),l:"Modules"},{v:"🔥",l:"Streak System"}].map((s,i)=>(
                 <div key={i} style={{textAlign:"center"}}>
                   <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.4rem",fontWeight:700,color:C.gold}}>{s.v}</div>
@@ -1626,7 +1703,7 @@ const HomePage = ({ setPage, setCourse }) => {
 
       {/* Feature pills */}
       <section style={{padding:"52px 5%",background:C.creamD}}>
-        <div style={{maxWidth:1200,margin:"0 auto",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
+        <div className="grid-4" style={{maxWidth:1200,margin:"0 auto",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
           {[
             {icon:"▶️",t:"YouTube Videos",d:"Embed your YouTube playlist — your lessons, your way."},
             {icon:"🔥",t:"Daily Streaks",d:"Build a learning habit. Don't break the chain!"},
@@ -1651,7 +1728,7 @@ const HomePage = ({ setPage, setCourse }) => {
             <Divider/>
             <p style={{color:C.textM,maxWidth:440,margin:"9px auto",fontSize:".88rem",lineHeight:1.7}}>Each course has YouTube video lessons, structured modules, and personal note-taking.</p>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20}}>
+          <div className="grid-3" style={{gridTemplateColumns:"repeat(3,1fr)",gap:20}}>
             {COURSES.slice(0,6).map(c=><CourseCard key={c.id} course={c} onClick={c=>{setCourse(c);setPage("course-detail");}}/>)}
           </div>
           <div style={{textAlign:"center",marginTop:32}}>
@@ -1728,7 +1805,7 @@ const CoursesPage = ({ setPage, setCourse }) => {
           <span style={{fontSize:".76rem",color:C.textL,marginLeft:"auto"}}>{filtered.length} courses</span>
         </div>
         {filtered.length>0 ? (
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20}}>
+          <div className="grid-3" style={{gridTemplateColumns:"repeat(3,1fr)",gap:20}}>
             {filtered.map(c=><CourseCard key={c.id} course={c} onClick={c=>{setCourse(c);setPage("course-detail");}}/>)}
           </div>
         ) : (
@@ -1757,11 +1834,16 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
     setDoneIds(DB.progress(course.id));
   }, [course?.id]);
 
-  if (!course) return null;
-
-  const tot = totalLessons(course);
+  const tot = course ? totalLessons(course) : 0;
   const dn  = doneIds.length;
   const pct = tot>0 ? Math.round(dn/tot*100) : 0;
+  useEffect(() => {
+    if (course && pct === 100) {
+      setPage("certificate");
+    }
+  }, [course, pct, setPage]);
+
+  if (!course) return null;
 
   const handleEnroll = () => {
     if (!loggedIn) { setPage("login"); return; }
@@ -1781,7 +1863,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
       {/* Hero */}
       <div style={{background:`linear-gradient(160deg,${C.emD},${course.color})`,padding:"44px 5% 34px",position:"relative",overflow:"hidden"}}>
         <Iso op={0.07} col={C.gold}/>
-        <div style={{maxWidth:1200,margin:"0 auto",display:"grid",gridTemplateColumns:"1fr auto",gap:34,alignItems:"start",position:"relative",zIndex:1}}>
+        <div className="split-grid" style={{maxWidth:1200,margin:"0 auto",gridTemplateColumns:"1fr auto",gap:34,alignItems:"start",position:"relative",zIndex:1}}>
           <div>
             <div style={{display:"flex",gap:6,marginBottom:12}}>
               <Badge col={C.gold}>{course.category}</Badge>
@@ -1791,7 +1873,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
             <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.95rem",color:"white",marginBottom:4}}>{course.title}</h1>
             <div style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".98rem",marginBottom:11}}>{course.titleAr}</div>
             <p style={{color:"rgba(255,255,255,.7)",fontSize:".93rem",lineHeight:1.75,maxWidth:560,marginBottom:15}}>{course.desc}</p>
-            <div style={{display:"flex",gap:18,fontSize:".8rem",color:"rgba(255,255,255,.62)",marginBottom:15}}>
+            <div className="course-detail-meta" style={{display:"flex",gap:18,fontSize:".8rem",color:"rgba(255,255,255,.62)",marginBottom:15}}>
               <span>👤 {course.instructor}</span>
               <span>📦 {course.modules.length} modules</span>
               <span>📚 {tot} lessons</span>
@@ -1801,7 +1883,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
             {enrolled&&<div style={{marginTop:12,maxWidth:310}}><PBar value={pct} label={`Your Progress: ${dn}/${tot} lessons`}/></div>}
           </div>
           {/* Enroll card */}
-          <div style={{background:"white",borderRadius:14,padding:22,minWidth:255,boxShadow:"0 14px 46px rgba(0,0,0,.2)"}}>
+          <div className="course-detail-enroll" style={{background:"white",borderRadius:14,padding:22,minWidth:255,boxShadow:"0 14px 46px rgba(0,0,0,.2)"}}>
             <div style={{fontSize:"2rem",textAlign:"center",marginBottom:9}}>{course.thumb}</div>
             <div style={{textAlign:"center",marginBottom:14}}>
               <div style={{fontSize:"1.6rem",fontWeight:800,color:C.em}}>{course.isFree?"Free":`$${course.price}`}</div>
@@ -1834,7 +1916,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
 
       {/* Tabs */}
       <div style={{borderBottom:`1px solid ${C.border}`,background:"white",position:"sticky",top:64,zIndex:10}}>
-        <div style={{maxWidth:1200,margin:"0 auto",padding:"0 5%",display:"flex"}}>
+        <div className="tabs-scroll" style={{maxWidth:1200,margin:"0 auto",padding:"0 5%",display:"flex"}}>
           {["modules","instructor","resources"].map(t=>(
             <button key={t} className={`tab${tab===t?" on":""}`} onClick={()=>setTab(t)} style={{textTransform:"capitalize"}}>{t}</button>
           ))}
@@ -1844,7 +1926,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
       <div style={{maxWidth:880,margin:"0 auto",padding:"34px 5%"}}>
         {tab==="modules"&&(
           <div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+            <div className="course-detail-heading" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
               <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.28rem",color:C.emD}}>{course.modules.length} Modules · {tot} Lessons</h2>
               {enrolled&&<Badge col={C.em}>{pct}% Complete</Badge>}
             </div>
@@ -1852,7 +1934,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
           </div>
         )}
         {tab==="instructor"&&(
-          <div style={{display:"flex",gap:20,padding:22,background:"white",borderRadius:14,border:`1px solid ${C.border}`}}>
+          <div className="course-detail-instructor" style={{display:"flex",gap:20,padding:22,background:"white",borderRadius:14,border:`1px solid ${C.border}`}}>
             <div style={{width:68,height:68,borderRadius:"50%",flexShrink:0,background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:"1.3rem",fontWeight:700}}>
               {course.instructor.split(" ").map(w=>w[0]).join("").slice(0,2)}
             </div>
@@ -1873,7 +1955,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
                 <div key={mod.id} style={{marginBottom:18}}>
                   <div style={{fontWeight:700,color:C.text,marginBottom:9,fontSize:".86rem"}}>{mod.title}</div>
                   {withRes.map(ls=>ls.resources?.map(r=>(
-                    <div key={r} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"white",borderRadius:9,border:`1px solid ${C.border}`,marginBottom:6}}>
+                    <div key={r} className="course-detail-heading" style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"white",borderRadius:9,border:`1px solid ${C.border}`,marginBottom:6}}>
                       <span style={{color:C.red}}>📄</span>
                       <span style={{flex:1,fontSize:".82rem",color:C.text}}>{r}</span>
                       <span style={{fontSize:".68rem",color:C.textL,marginRight:8}}>{ls.title}</span>
@@ -1991,22 +2073,22 @@ const LessonPage = ({ lessonData, setPage, setLesson }) => {
   return (
     <div style={{paddingTop:64,background:"#0C0C0C",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
       {/* Top bar */}
-      <div style={{background:C.emD,padding:"8px 18px",display:"flex",alignItems:"center",gap:11,borderBottom:"1px solid rgba(255,255,255,.06)",flexShrink:0}}>
+      <div className="lesson-topbar" style={{background:C.emD,padding:"8px 18px",display:"flex",alignItems:"center",gap:11,borderBottom:"1px solid rgba(255,255,255,.06)",flexShrink:0}}>
         <button onClick={()=>setPage("course-detail")} style={{background:"none",border:"none",color:"rgba(255,255,255,.52)",cursor:"pointer",fontSize:".78rem",fontFamily:"'Nunito Sans',sans-serif",flexShrink:0}}>← Back</button>
         <span style={{color:"rgba(255,255,255,.18)"}}>|</span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{color:"white",fontSize:".82rem",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{course.title}</div>
           <div style={{color:"rgba(255,255,255,.36)",fontSize:".68rem"}}>{curMod?.title} · Lesson {li+1}</div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:9,flexShrink:0}}>
+        <div className="lesson-progress" style={{display:"flex",alignItems:"center",gap:9,flexShrink:0}}>
           <span style={{color:"rgba(255,255,255,.38)",fontSize:".72rem"}}>{pct}% done</span>
           <div style={{width:90}}><div className="pbar"><div className="pfill" style={{width:`${pct}%`}}/></div></div>
         </div>
       </div>
 
-      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+      <div className="lesson-main" style={{display:"flex",flex:1,overflow:"hidden"}}>
         {/* Video + info */}
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"auto",minWidth:0}}>
+        <div className="lesson-content" style={{flex:1,display:"flex",flexDirection:"column",overflow:"auto",minWidth:0}}>
           {/* 16:9 player */}
           <div style={{background:"#000",position:"relative",width:"100%"}}>
             <div style={{paddingTop:"56.25%",position:"relative"}}>
@@ -2051,10 +2133,10 @@ const LessonPage = ({ lessonData, setPage, setLesson }) => {
                   : "This lesson is not currently available for in-site playback, so manual completion is shown instead."}
               </div>
             )}
-            <div style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap"}}>
+            <div className="lesson-actions" style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap"}}>
               <Btn size="sm" v="dark" onClick={goPrev} disabled={flatIdx===0} icon="◀">Prev</Btn>
               <Btn size="sm" v="dark" onClick={goNext} disabled={flatIdx===tot-1}>Next ▶</Btn>
-              <div style={{flex:1}}/>
+              <div className="lesson-spacer" style={{flex:1}}/>
               {confetti ? (
                 <div style={{display:"flex",alignItems:"center",gap:6,color:C.goldL,fontWeight:700,fontSize:".85rem",animation:"pop .4s ease"}}>
                   🎉 Complete! 🔥 Streak updated!
@@ -2089,7 +2171,7 @@ const LessonPage = ({ lessonData, setPage, setLesson }) => {
         </div>
 
         {/* Right sidebar */}
-        <div style={{width:310,background:"#111",borderLeft:"1px solid rgba(255,255,255,.05)",display:"flex",flexDirection:"column",flexShrink:0}}>
+        <div className="lesson-sidebar" style={{width:310,background:"#111",borderLeft:"1px solid rgba(255,255,255,.05)",display:"flex",flexDirection:"column",flexShrink:0}}>
           {/* Sidebar tabs */}
           <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,.05)",flexShrink:0}}>
             {[{k:"chapters",l:"📦 Chapters"},{k:"notes",l:"📝 Notes"},{k:"files",l:"📄 Files"}].map(t=>(
@@ -2274,9 +2356,9 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
   };
 
   return (
-    <div className="page" style={{paddingTop:64,display:"flex",minHeight:"100vh",background:C.cream}}>
+    <div className="page dashboard-shell" style={{paddingTop:64,display:"flex",minHeight:"100vh",background:C.cream}}>
       {/* Sidebar */}
-      <div style={{width:218,background:"white",borderRight:`1px solid ${C.border}`,padding:"18px 12px",position:"fixed",top:64,bottom:0,overflowY:"auto"}}>
+      <div className="dashboard-sidebar" style={{width:218,background:"white",borderRight:`1px solid ${C.border}`,padding:"18px 12px",position:"fixed",top:64,bottom:0,overflowY:"auto"}}>
         <div style={{textAlign:"center",padding:"15px 0 18px",borderBottom:`1px solid ${C.border}`,marginBottom:11}}>
           <div style={{width:56,height:56,borderRadius:"50%",margin:"0 auto 8px",background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:"1.15rem",fontWeight:700}}>{initials}</div>
           <div style={{fontWeight:700,fontSize:".88rem"}}>{currentUser.name}</div>
@@ -2298,7 +2380,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
       </div>
 
       {/* Content */}
-      <div style={{flex:1,marginLeft:218,padding:"26px 30px"}}>
+      <div className="dashboard-content" style={{flex:1,marginLeft:218,padding:"26px 30px"}}>
 
         {/* ── Overview ── */}
         {sec==="overview"&&(
@@ -2308,7 +2390,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
               <p style={{color:C.textL,fontSize:".83rem",marginTop:3}}>Track your learning, streak, certificates, and notes in one place.</p>
             </div>
             {/* Stats */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:13,marginBottom:15}}>
+            <div className="grid-4" style={{gridTemplateColumns:"repeat(4,1fr)",gap:13,marginBottom:15}}>
               {[{icon:"📚",l:"Enrolled",v:courses.length,col:C.em},{icon:"✅",l:"Lessons Done",v:totalDone,col:C.green},{icon:"🔥",l:"Day Streak",v:streak.count||0,col:C.gold},{icon:"🏆",l:"Certificates",v:completedCourses.length,col:"#7C3AED"}].map((s,i)=>(
                 <div key={i} style={{background:"white",borderRadius:12,padding:16,border:`1px solid ${C.border}`,boxShadow:"0 2px 8px rgba(11,82,64,.05)"}}>
                   <div style={{fontSize:"1.3rem",marginBottom:5}}>{s.icon}</div>
@@ -2331,7 +2413,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                 <Btn v="gold" onClick={()=>setPage("courses")} icon="🎓">Browse Courses</Btn>
               </div>
             ) : (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:13}}>
+                <div className="grid-2 dashboard-highlight-grid" style={{gridTemplateColumns:"1fr 1fr",gap:13}}>
                 {courses.slice(0,4).map(c=>{
                   const tot = totalLessons(c);
                   const dn  = DB.progress(c.id).length;
@@ -2495,32 +2577,32 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                 certificateId: `NUR-${String(c.id).padStart(3, "0")}-${dayKey().replaceAll("-", "")}-${currentUser.id.slice(-4).toUpperCase()}`,
               };
               return (
-              <div key={c.id} style={{background:"white",borderRadius:14,border:`2px solid ${C.gold}32`,overflow:"hidden",marginBottom:18,boxShadow:C.shG}}>
-                <div style={{background:`linear-gradient(135deg,${C.emD},${C.em})`,padding:"22px 34px",position:"relative",overflow:"hidden"}}>
-                  <Iso op={0.1} col={C.gold}/>
-                  <div style={{position:"relative",zIndex:1,textAlign:"center"}}>
+                <div key={c.id} style={{background:"white",borderRadius:14,border:`2px solid ${C.gold}32`,overflow:"hidden",marginBottom:18,boxShadow:C.shG}}>
+                  <div style={{background:`linear-gradient(135deg,${C.emD},${C.em})`,padding:"22px 34px",position:"relative",overflow:"hidden"}}>
+                    <Iso op={0.1} col={C.gold}/>
+                    <div style={{position:"relative",zIndex:1,textAlign:"center"}}>
                     <div style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:"1rem",marginBottom:2}}>نور أكاديمي · Nur Academy</div>
                     <div style={{fontFamily:"'Amiri',serif",color:"white",fontSize:"1.55rem",fontWeight:700}}>Certificate of Completion</div>
                   </div>
                 </div>
-                <div style={{padding:"20px 34px",textAlign:"center",background:C.cream}}>
-                  <div style={{borderTop:`2px solid ${C.gold}28`,borderBottom:`2px solid ${C.gold}28`,padding:"14px 0",margin:"0 0 14px"}}>
-                    <div style={{color:C.textL,fontSize:".78rem",marginBottom:5}}>This certifies that</div>
+                  <div style={{padding:"20px 34px",textAlign:"center",background:C.cream}}>
+                    <div style={{borderTop:`2px solid ${C.gold}28`,borderBottom:`2px solid ${C.gold}28`,padding:"14px 0",margin:"0 0 14px"}}>
+                      <div style={{color:C.textL,fontSize:".78rem",marginBottom:5}}>This certifies that</div>
                     <div style={{fontFamily:"'Amiri',serif",fontSize:"1.35rem",color:C.emD,fontWeight:700}}>{currentUser.name}</div>
                     <div style={{color:C.textL,fontSize:".78rem",margin:"5px 0"}}>has successfully completed</div>
                     <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.08rem",color:C.gold,fontWeight:700}}>{c.title}</div>
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:".7rem",color:C.textL}}>
-                    <span>📅 {formatDay(completion.completedAt)}</span>
-                    <span>🔐 {completion.certificateId}</span>
+                      <span>📅 {formatDay(completion.completedAt)}</span>
+                      <span>🔐 {completion.certificateId}</span>
+                    </div>
                   </div>
-                </div>
-                <div style={{padding:"11px 34px",background:"white",display:"flex",gap:8,justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`}}>
-                  <div style={{fontSize:".72rem",color:copyMsg?C.green:C.textL}}>{copyMsg || "Print now on GitHub Pages. Later, Railway can issue server-verified certificates."}</div>
-                  <div style={{display:"flex",gap:8}}>
-                    <Btn size="sm" v="outline" onClick={()=>handleCopyId(completion.certificateId)}>🔑 Copy ID</Btn>
-                    <Btn size="sm" v="gold" onClick={()=>printCertificate(c, currentUser, completion)}>🖨 Print / Save PDF</Btn>
-                  </div>
+                  <div className="dashboard-cert-footer" style={{padding:"11px 34px",background:"white",display:"flex",gap:8,justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`}}>
+                    <div style={{fontSize:".72rem",color:copyMsg?C.green:C.textL}}>{copyMsg || "Print now on GitHub Pages. Later, Railway can issue server-verified certificates."}</div>
+                    <div className="action-row" style={{display:"flex",gap:8}}>
+                      <Btn size="sm" v="outline" onClick={()=>handleCopyId(completion.certificateId)}>🔑 Copy ID</Btn>
+                      <Btn size="sm" v="gold" onClick={()=>printCertificate(c, currentUser, completion)}>🖨 Print / Save PDF</Btn>
+                    </div>
                 </div>
               </div>
             )})}
@@ -2532,7 +2614,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
           <div className="page" style={{maxWidth:520}}>
             <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.6rem",color:C.emD,marginBottom:18}}>My Profile</h1>
             <div style={{background:"white",borderRadius:14,padding:26,border:`1px solid ${C.border}`}}>
-              <div style={{display:"flex",gap:15,alignItems:"center",marginBottom:22}}>
+              <div className="profile-head" style={{display:"flex",gap:15,alignItems:"center",marginBottom:22}}>
                 <div style={{width:66,height:66,borderRadius:"50%",background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:"1.4rem",fontWeight:700}}>{initials}</div>
                 <div>
                   <div style={{fontWeight:700,fontSize:".98rem"}}>{currentUser.name}</div>
@@ -2582,7 +2664,7 @@ const LoginPage = ({ setPage, onLogin }) => {
   return (
     <div className="page" style={{paddingTop:64,minHeight:"100vh",background:`linear-gradient(160deg,${C.emD},${C.em})`,display:"flex",alignItems:"center",justifyContent:"center",padding:"64px 20px 36px",position:"relative"}}>
       <Iso op={0.06} col={C.gold}/>
-      <div style={{background:"white",borderRadius:20,padding:38,maxWidth:410,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
+      <div className="auth-card" style={{background:"white",borderRadius:20,padding:38,maxWidth:410,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
         <div style={{textAlign:"center",marginBottom:22}}>
           <div style={{width:46,height:46,borderRadius:11,background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 9px"}}>
             <svg width="23" height="23" viewBox="0 0 22 22"><polygon points="11,2 13,8 19,8 14,12 16,18 11,14 6,18 8,12 3,8 9,8" fill="white"/></svg>
@@ -2660,14 +2742,14 @@ const RegisterPage = ({ setPage, onRegister }) => {
   return (
     <div className="page" style={{paddingTop:64,minHeight:"100vh",background:`linear-gradient(160deg,${C.emD},${C.em})`,display:"flex",alignItems:"center",justifyContent:"center",padding:"64px 20px 36px",position:"relative"}}>
       <Iso op={0.06} col={C.gold}/>
-      <div style={{background:"white",borderRadius:20,padding:38,maxWidth:430,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
+      <div className="auth-card" style={{background:"white",borderRadius:20,padding:38,maxWidth:430,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
         <div style={{textAlign:"center",marginBottom:20}}>
           <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.45rem",color:C.emD}}>Join Nur Academy</h1>
           <p style={{fontFamily:"'Amiri',serif",color:C.gold}}>انضم إلى نور أكاديمي</p>
         </div>
         <Divider/>
         <div style={{marginTop:18}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:11,marginBottom:11}}>
+          <div className="auth-name-grid grid-2" style={{gridTemplateColumns:"1fr 1fr",gap:11,marginBottom:11}}>
             {[["First Name","firstName","Ahmad"],["Last Name","lastName","Al-Farsi"]].map(([label,key,placeholder])=>(
               <div key={label}>
                 <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
@@ -2721,7 +2803,7 @@ const AboutPage = () => (
       </div>
     </div>
     <div style={{padding:"56px 5%",background:C.cream,maxWidth:980,margin:"0 auto"}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:15,marginBottom:30}}>
+      <div className="grid-4" style={{gridTemplateColumns:"repeat(4,1fr)",gap:15,marginBottom:30}}>
         {[{v:"2020",l:"Founded"},{v:"80+",l:"Countries"},{v:"45+",l:"Scholars"},{v:"12K+",l:"Students"}].map(s=>(
           <div key={s.l} style={{background:"white",borderRadius:12,padding:20,textAlign:"center",border:`1px solid ${C.border}`}}>
             <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.75rem",fontWeight:700,color:C.em}}>{s.v}</div>
@@ -2748,7 +2830,7 @@ const ContactPage = () => {
         <h1 style={{fontFamily:"'Amiri',serif",fontSize:"2rem",color:"white",position:"relative",zIndex:1}}>Contact Us</h1>
         <p style={{fontFamily:"'Amiri',serif",color:C.gold,position:"relative",zIndex:1}}>تواصل معنا</p>
       </div>
-      <div style={{padding:"48px 5%",background:C.cream,maxWidth:950,margin:"0 auto",display:"grid",gridTemplateColumns:"1fr 1fr",gap:44}}>
+      <div className="split-grid" style={{padding:"48px 5%",background:C.cream,maxWidth:950,margin:"0 auto",gridTemplateColumns:"1fr 1fr",gap:44}}>
         <div>
           <h2 style={{fontFamily:"'Amiri',serif",fontSize:"1.6rem",color:C.emD,marginBottom:18}}>Get In Touch</h2>
           {[{icon:"📧",l:"Email",v:"info@nuracademy.com"},{icon:"💬",l:"WhatsApp",v:"+1 (555) 123-4567"},{icon:"🌍",l:"Community",v:"discord.gg/nuracademy"}].map((c,i)=>(
@@ -2807,8 +2889,8 @@ const AdminPage = ({ setPage, currentUser }) => {
   }
 
   return (
-    <div className="page" style={{paddingTop:64,display:"flex",minHeight:"100vh",background:"#F0F0F5"}}>
-      <div style={{width:200,background:C.emD,padding:"18px 10px",position:"fixed",top:64,bottom:0}}>
+    <div className="page admin-shell" style={{paddingTop:64,display:"flex",minHeight:"100vh",background:"#F0F0F5"}}>
+      <div className="admin-sidebar" style={{width:200,background:C.emD,padding:"18px 10px",position:"fixed",top:64,bottom:0}}>
         <div style={{padding:"9px 6px 17px",borderBottom:"1px solid rgba(255,255,255,.1)",marginBottom:9}}>
           <div style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".83rem"}}>نور أكاديمي</div>
           <div style={{color:"white",fontWeight:700,fontSize:".78rem"}}>Admin Panel</div>
@@ -2822,17 +2904,17 @@ const AdminPage = ({ setPage, currentUser }) => {
           <span>🚪</span>Exit Admin
         </div>
       </div>
-      <div style={{flex:1,marginLeft:200,padding:"22px 26px"}}>
+      <div className="admin-content" style={{flex:1,marginLeft:200,padding:"22px 26px"}}>
         {sec==="overview"&&(
           <div className="page">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+            <div className="admin-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
               <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E"}}>Admin Overview</h1>
               <Btn v="gold" icon="+" onClick={()=>setShowAdd(true)}>Add Course</Btn>
             </div>
             <div style={{background:"white",borderRadius:12,padding:"13px 16px",boxShadow:"0 2px 8px rgba(0,0,0,.06)",marginBottom:16,fontSize:".78rem",color:"#6B7280",lineHeight:1.6}}>
               This admin panel is read-only while you are on GitHub Pages. When you move to Railway, connect these screens to your API for real course, student, and certificate management.
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:13,marginBottom:20}}>
+            <div className="grid-4" style={{gridTemplateColumns:"repeat(4,1fr)",gap:13,marginBottom:20}}>
               {[{icon:"👥",l:"Students",v:"12,847",col:C.em},{icon:"📚",l:"Courses",v:"9",col:C.gold},{icon:"📦",l:"Total Modules",v:String(COURSES.reduce((a,c)=>a+c.modules.length,0)),col:"#7C3AED"},{icon:"💰",l:"Revenue",v:"$18,940",col:C.green}].map((s,i)=>(
                 <div key={i} style={{background:"white",borderRadius:12,padding:16,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
                   <div style={{fontSize:"1.25rem",marginBottom:5}}>{s.icon}</div>
@@ -2841,7 +2923,7 @@ const AdminPage = ({ setPage, currentUser }) => {
                 </div>
               ))}
             </div>
-            <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+            <div className="table-wrap" style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
               <div style={{padding:"13px 17px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:".86rem",color:"#1A1A2E"}}>All Courses</div>
               <table>
                 <thead><tr>{["Course","Category","Modules","Lessons","Students","Price"].map(h=><th key={h}>{h}</th>)}</tr></thead>
@@ -2892,7 +2974,7 @@ const AdminPage = ({ setPage, currentUser }) => {
                 <input type={t} placeholder={ph} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".85rem"}}/>
               </div>
             ))}
-            <div style={{display:"flex",gap:9,marginTop:4}}>
+            <div className="action-row" style={{display:"flex",gap:9,marginTop:4}}>
               <Btn v="outline" onClick={()=>setShowAdd(false)}>Cancel</Btn>
               <Btn v="primary" onClick={()=>setShowAdd(false)}>✓ Create Course</Btn>
             </div>
@@ -2975,7 +3057,12 @@ export default function App() {
         {page==="register"      && <RegisterPage     setPage={setPage} onRegister={handleLogin}/>}
         {page==="about"         && <AboutPage/>}
         {page==="contact"       && <ContactPage/>}
-
+        {page==="certificate" && (
+          <CertificatePage
+            user={currentUser}
+            course={course}
+          />
+        )}
         {!noFooter&&<Footer/>}
 
         {/* Floating admin shortcut */}
