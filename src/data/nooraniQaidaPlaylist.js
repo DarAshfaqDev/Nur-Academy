@@ -1,72 +1,496 @@
-export const NOORANI_QAIDA_PLAYLIST_ID = "PLXMHFOJ1g5ph6HVlPG5pywc97wCd9m9wW";
+export const NOORANI_QAIDA_PLAYLIST_ID = "PLlGFtd0TFVPXZGT29OY7jOcSWRIynSVJB";
 
 export const NOORANI_QAIDA_PLAYLIST_ITEMS = [
-  { index: 1, youtubeId: "E25yeJ04PtQ", duration: "5:07", sourceTitle: "Arabic alphabet | Arabic letters | Noorani Qaida Lesson 1| Arabi Qaida | Alif Ba Ta | Learn Quran" },
-  { index: 2, youtubeId: "DRsbkaHaz_U", duration: "3:02", sourceTitle: "Arabic Alphabet Noorani Qaida Lesson 1 part 2 | Arabi Qaida | Noorani Qaida Takhti 1 | Quran Tajweed" },
-  { index: 3, youtubeId: "uAatb0KA0XE", duration: "7:16", sourceTitle: "Alif Ba Ta | Arabic Alphabet | Noorani Qaida lesson 1 | Learn Arabic | Learn Quran online | Quran" },
-  { index: 4, youtubeId: "sfDIbEEZ0Nk", duration: "7:36", sourceTitle: "Noorani Qaida | Nuqton ki pehchan | importance of dot in Arabic letters | Nuqta | learn Quran online" },
-  { index: 5, youtubeId: "sHuzIB6IV1c", duration: "4:46", sourceTitle: "Noorani Qaida lesson 2 | Quran online | Arabic Alphabet | Online Arabic course | Learn Quran online" },
-  { index: 6, youtubeId: "KmixFttZeuw", duration: "5:46", sourceTitle: "Noorani Qaida lesson 2 | Quran online | Arabic Alphabet | Online Arabic course | Murakkab letters" },
-  { index: 7, youtubeId: "oO9tMVnrEa0", duration: "6:51", sourceTitle: "Quran online | Noorani Qaida Lesson 2 part 3 | Arabic alphabet | E learning Quran | Basic Arabic" },
-  { index: 8, youtubeId: "jvGsKVFu_9E", duration: "7:03", sourceTitle: "Noorani Qaida Lesson 2 | Arabic joint letters | Quran online | Arabic Alphabet | Alif Ba Ta | Quran" },
-  { index: 9, youtubeId: "3tQSQUDC7xw", duration: "9:57", sourceTitle: "Noorani Qaida lesson 3 | Arabic for beginners | Harakat Zabar Hijje | Online Arabic course | Tajweed" },
-  { index: 10, youtubeId: "6scjWEG_D0M", duration: "6:54", sourceTitle: "Noorani Qaida lesson 3 Practice | Arabic for beginners | Hijje | Arabic Alphabet | Alif Baa Taa" },
-  { index: 11, youtubeId: "L0-9lWd4n7Y", duration: "15:56", sourceTitle: "Noorani Qaida lesson 3 Harakat complete | Arabic for beginners | Hijje bina hijje | Arabic Alphabet" },
-  { index: 12, youtubeId: "BQmPcUTGzb4", duration: "5:45", sourceTitle: "Noorani Qaida lesson 3 | Zabar Zer Pesh | Arabic for beginners | Arabic alphabet | Quran Tajweed" },
-  { index: 13, youtubeId: "tQeqK-RkFXU", duration: "13:33", sourceTitle: "Noorani Qaida lesson Zer | Quran with Tajweed | Zabar Zer Pesh | Basic Arabic | Alif Baa | Zer Kasra" },
-  { index: 14, youtubeId: "BVPq4DXCPAw", duration: "11:46", sourceTitle: "Noorani Qaida lesson (ZER) Learn with Tajweed | Learn Quran | Noorani Qaida Zabar Zer Pesh | Arabic" },
-  { index: 15, youtubeId: "ixrvpyX0qlY", duration: "7:45", sourceTitle: "Learn Quran | Noorani Qaida Lesson 3 Zer  | Zabar Zer Pesh | Basic Arabic for beginners | Alfi Baa" },
-  { index: 16, youtubeId: "BSkfII17ZRY", duration: "9:03", sourceTitle: "Arabic alphabet | Noorani Qaida lesson 3 Pesh | Arabic for beginners | Learn Arabic | Learn Quran" },
-  { index: 17, youtubeId: "K6SBej0skeI", duration: "5:38", sourceTitle: "Noorani Qaida lesson 3 Pesh practice | Arabic alphabet | Arabic for beginners | Read Quran online" },
-  { index: 18, youtubeId: "x6nHw2CcLyc", duration: "11:12", sourceTitle: "Noorani Qaida Lesson 3 | Pesh Zamma | Arabic Qaida | Quran with Tajweed | Arabic for beginners" },
-  { index: 19, youtubeId: "pPHLKugX4Gg", duration: "8:11", sourceTitle: "Noorani Qaida Lesson 3 Pesh | Zamma | Arabic Qaida | Quran with Tajweed | Arabic for beginners" },
-  { index: 20, youtubeId: "_BZRSSfQHIk", duration: "8:13", sourceTitle: "Noorani Qaida Lesson 4 | Alif maddah | Arabic alphabet | Horoof Maddah | Alif Baa Taa | Read Quran" },
-  { index: 21, youtubeId: "yh0uFOcQzQc", duration: "12:13", sourceTitle: "Arabic alphabet | Alif Baa Taa | Noorani Qaida lesson 2 complete | Quran Tajweed | Basic Arabic" },
-  { index: 22, youtubeId: "9sFzmfPdl7Q", duration: "12:07", sourceTitle: "Quran with Tajweed | Noorani Qaida Lesson 4 Alif madd | Read Quran online | Alif Baa Taa | Koran" },
-  { index: 23, youtubeId: "lzJJsBlzook", duration: "5:39", sourceTitle: "Arabic alphabet | Noorani Qaida Lesson 4 Ya madd | Quran Tajweed | Arabic for all | madd letters" },
-  { index: 24, youtubeId: "go2nSvdTmQs", duration: "13:07", sourceTitle: "Quran Tajweed | Huroof e maddah | Noorani Qaida Lesson 4 Ya maddah | Learn Quran | Learn Arabic" },
-  { index: 25, youtubeId: "5vLwGEKULCM", duration: "8:36", sourceTitle: "Long vowels in Arabic | Noorani Qaida Lesson 4 Ya maddah | Quran Tajweed | Madd leters in Arabic" },
-  { index: 26, youtubeId: "crxeq6J6ews", duration: "12:31", sourceTitle: "Noorani Qaida Lesson 4 Waw maddah | Quran with Tajweed | Arabic for beginners | Vowels in Quran" },
-  { index: 27, youtubeId: "RzYQvBMY_ZE", duration: "7:02", sourceTitle: "Noorani Qaida Lesson 4 | Waw maddah exercise | Tajweed Quran | Arabic for beginners | Learn Arabic" },
-  { index: 28, youtubeId: "yq_VfQsLN8Y", duration: "10:58", sourceTitle: "Learn Arabic | Noorani Qaida Lesson 4 | Waw maddah | Horoof e madda | Learn Quran | Quran for all" },
-  { index: 29, youtubeId: "E3mVKBC4r_k", duration: "11:13", sourceTitle: "Khada Zabar | Noorani Qaida | Quran Tajweed | Arabic for beginners | Tajweed Quran | Arabic Qaida" },
-  { index: 30, youtubeId: "4QTAhLXkGs4", duration: "8:02", sourceTitle: "Huroof e Maddah | Khada Zabar | Noorani Qaida lesson 4 | Quran with Tajweed | Arabic for beginners" },
-  { index: 31, youtubeId: "TEq8b3Ua8TA", duration: "12:55", sourceTitle: "Khada Zer | Arabi Qaida | Quran with Tajweed | Arabic for beginners | Basic Arabic | Arabic language" },
-  { index: 32, youtubeId: "Xz3toLWc-VQ", duration: "7:14", sourceTitle: "Basic Arabic | Khadi Zer | Arabi Qaida | Quran Tajweed | Arabic for beginners | Noorani Qaida" },
-  { index: 33, youtubeId: "Q1hUhxb72eE", duration: "14:36", sourceTitle: "Noorani Qaida Ulta Pesh | Arabi Qaida | Quran Tajweed | Arabic for beginners | Ulta Pesh in Arabic" },
-  { index: 34, youtubeId: "w1_Bwl-cs4A", duration: "4:54", sourceTitle: "Ulta Pesh in Arabic | Learn Arabic | Quran with Tajweed | Quran for beginners | Basic Arabic for all" },
-  { index: 35, youtubeId: "ROyeP7ebF0o", duration: "11:52", sourceTitle: "Ulta Pesh Noorani Qaida | Arabic made easy | Quran Tajweed | Arabic for beginners | Basic Arabic" },
-  { index: 36, youtubeId: "bwuNpquiNWM", duration: "12:00", sourceTitle: "Quran Tajweed | Noorani Qaida Lesson 5 with spelling | Huroof e leen |  Arabic for beginners | Kuran" },
-  { index: 37, youtubeId: "f6bp3dUuWTA", duration: "7:38", sourceTitle: "Quran Tajweed | Noorani Qaida Lesson 5 leen letters |  Arabic for beginners | Quran with Tajweed" },
-  { index: 38, youtubeId: "QVt4u5eJ878", duration: "2:56", sourceTitle: "Quran with Tajweed | Noorani Qaida Lesson 5 | Huroof e leen |  Quran for beginners | Kuran Tajweed" },
-  { index: 39, youtubeId: "nXDIqj1_5t0", duration: "12:40", sourceTitle: "Leen letters in Arabic | Tajweed Quran | Noorani Qaida Lesson 5 | Huroof e leen |  Arabic from Zero" },
-  { index: 40, youtubeId: "lW91ph9XcN0", duration: "4:31", sourceTitle: "Huroof e leen | Tajweed Quran | Noorani Qaida Lesson 5 | Arabic from Zero | Arabic for beginners" },
-  { index: 41, youtubeId: "45s0YfSOiDc", duration: "18:47", sourceTitle: "Learn Arabic alphabet | How to read Arabic vowels | Nurani Qaida Lesson 6 | Zabar Zer Pehs in Arabic" },
-  { index: 42, youtubeId: "whG80BW-URs", duration: "6:30", sourceTitle: "Noorani Qaida Takhti Number 6 | Arabic for beginners | Quran Tajweed | Zabar Zer Pehs in Arabic" },
-  { index: 43, youtubeId: "5ASjQC1Pvmc", duration: "35:24", sourceTitle: "Noorani Qaida Takhti Number 6 with explanation | Arabic for beginners | Tajweed rules for beginners" },
-  { index: 44, youtubeId: "tgwcaTlAdMo", duration: "8:10", sourceTitle: "The Zabar | Arabic Language | Light of the Throne Number 7 | Quran Tajweed |  Quran for beginners" },
-  { index: 45, youtubeId: "SwyM39vDA3I", duration: "6:24", sourceTitle: "Do Zabar do Zer do pesh | Tanween in Arabic | Quran Tajweed | Do Zer | Qaida Noorania lesson 7" },
-  { index: 46, youtubeId: "AEpxV0gcUx0", duration: "6:26", sourceTitle: "Tanween | Do Zabar do Zer do pesh | Tanween in Arabic | Quran Tajweed | Qaida Noorania lesson 7" },
-  { index: 47, youtubeId: "dMTsNi23ljI", duration: "18:56", sourceTitle: "Tanween lesson | Do Zabar do Zer do pesh | Tanween in Arabic | Quran Tajweed | Qaida Noorania Tanwin" },
-  { index: 48, youtubeId: "25qy6b-6Org", duration: "10:39", sourceTitle: "Noorani Qaida lesson 7 | Do Zabar do Zer do pesh | Tanween in Arabic | Quran Tajweed | Qaida" },
-  { index: 49, youtubeId: "aE1V1CUmtvI", duration: "8:02", sourceTitle: "Tanween lesson Noorani Qaida | Do Zabar do Zer do pesh | Tanween in Arabic | Tanween and Noon sakin" },
-  { index: 50, youtubeId: "oTxH0uda0Bc", duration: "14:47", sourceTitle: "Noorani Qaida lesson Tanween | Do Zabar do Zer do pesh | Tanween in Arabic | Quran Tajweed | Tajweed" },
-  { index: 51, youtubeId: "V7S1xZqGK7E", duration: "9:54", sourceTitle: "Noorani Qaida with spelling | Nunation in Arabic | Quran Tajweed | Quran learning | Learn Quran" },
-  { index: 52, youtubeId: "dxXJNkt2XIQ", duration: "10:47", sourceTitle: "Izhar in Tajweed | Tanween and Noon sakin rules | Izhar words in the Quran | Quran Tajweed | Izha..." },
-  { index: 53, youtubeId: "sy390CGiLEI", duration: "16:25", sourceTitle: "Izhar rule in Tajweed | What is izhar in Tajweed | Izhar words in Quran | Quran Tajweed | Tajweed" },
-  { index: 54, youtubeId: "51LWbA0VHA8", duration: "20:40", sourceTitle: "Izhar Tajweed | Ikhfa Tajweed | Izhar rules in Tajweed | Noorani Qaida Takhti 9 | Tajweed Quran" },
-  { index: 55, youtubeId: "tvv2qf94-Vk", duration: "6:44", sourceTitle: "Ikhfa rules in Tajweed | Noorani Qaida 10 ikhfa | ikhfa Tajweed | ikhfa kaise karen | Quran Tajweed" },
-  { index: 56, youtubeId: "0kvVST3RVJ4", duration: "16:26", sourceTitle: "Ikhfa Tajweed | Ikkfa rules Tajweed | Izhar ikhfa Tajweed | Quran Tajweed | Learn ikhfa rules" },
-  { index: 57, youtubeId: "A2PGiDEdyts", duration: "18:08", sourceTitle: "Ikhfa rules in Tajweed | How to do ikhfa in Quran | Izhar ikhfa rules in Tajweed | Quran Tajweed" },
-  { index: 58, youtubeId: "XqrU1SDon30", duration: "11:29", sourceTitle: "Noorani Qaida lesson 10 ikhfa | Ikhfa rules in Tajweed | Noorani Qaida takhti 10 ikhfa" },
-  { index: 59, youtubeId: "a_ib1IaYw98", duration: "28:55", sourceTitle: "Noorani Qaida lesson 10 ikhfa complete lesson with details | Ikhfa rules in Tajweed | What is ikhfa" },
-  { index: 60, youtubeId: "vWDngtGdTbU", duration: "6:13", sourceTitle: "Noorani Qaida lesson 11 Jazm Sukoon | Jazam Sukoon ki takhti | How to read sukoon in Arabic?" },
-  { index: 61, youtubeId: "kmP-ZUmJ0Fo", duration: "13:41", sourceTitle: "Noorani Qaida lesson 11 Jazam Sukoon with explanation | How to pronounce Arabic letters with sukoon" },
-  { index: 62, youtubeId: "ICoZtwz341A", duration: "13:32", sourceTitle: "Qalqalah Tajweed rules in Urdu | Noorani Qaida Qalqalah lesson | Letters of Qalqalah in Quran" },
-  { index: 63, youtubeId: "DOFu88-erOI", duration: "26:49", sourceTitle: "Noorani Qaida lesson 11 with explanation | Noorani Qaida Qalqalah lesson | Sukoon lesson in Arabic" },
-  { index: 64, youtubeId: "upVlVcvYoTM", duration: "8:09", sourceTitle: "Arabic Alphabet | Alif Ba Ta | Arabi Qaida Lesson 1 | Noorani Qaida lesson 1 | Learn Arabic horoof" },
-  { index: 65, youtubeId: "Ol2j-4sdPg0", duration: "5:52", sourceTitle: "Alif Ba Ta Sa | Arabic letters for beginners | Learn Arabic alphabet for beginners | Quran Tajweed" },
-  { index: 66, youtubeId: "xz-Sj3TxvMg", duration: "3:08", sourceTitle: "Alif Ba Ta Sa | How to learn Alif Baa Taa | Alifun Baa Arabic song | Arabic alphabet for beginners" },
-  { index: 67, youtubeId: "jfsS5HTws8g", duration: "5:36", sourceTitle: "Arabic letters Alif Ba Ta Sa | Arabic letters for beginners | Arabic alphabet for beginners" },
-  { index: 68, youtubeId: "HB66MIjm7Fc", duration: "5:15", sourceTitle: "Alif Ba Ta | Noorani Qaida lesson 1 Alif Ba Ta | Learn Arabic alphabet | Learn Quran with Tajweed" },
+  {
+    "index": 1,
+    "youtubeId": "U-4LZtenq74",
+    "duration": "2:21",
+    "sourceTitle": "Noorani Qaida Lesson 1 Part 1 In Urdu/Hindi | Noorania Qaida Lesson 1 Part 1 | learn Quran Online"
+  },
+  {
+    "index": 2,
+    "youtubeId": "oBQZetlFeFQ",
+    "duration": "3:19",
+    "sourceTitle": "Noorani Qaida Lesson 1 Part 2 In Urdu/Hindi | Noorania Qaida Lesson 1 Part 2 | learn Quran Online"
+  },
+  {
+    "index": 3,
+    "youtubeId": "BkBReuKp_VU",
+    "duration": "2:59",
+    "sourceTitle": "Noorani Qaida Lesson 1 Part 3 In Urdu/Hindi | Noorania Qaida Lesson 1 Part 3 | learn Quran Online"
+  },
+  {
+    "index": 4,
+    "youtubeId": "JIJwudSYRr8",
+    "duration": "3:57",
+    "sourceTitle": "Noorani Qaida Lesson 2 Part 1 In Urdu/Hindi | Noorania Qaida Lesson 2 Part 1 | learn Quran Online"
+  },
+  {
+    "index": 5,
+    "youtubeId": "Nx8YKagIm98",
+    "duration": "2:54",
+    "sourceTitle": "Noorani Qaida Lesson 2 Part 2 In Urdu/Hindi | Noorania Qaida Lesson 2 Part 2 | learn Quran Online"
+  },
+  {
+    "index": 6,
+    "youtubeId": "cQc1lZUwYW0",
+    "duration": "3:25",
+    "sourceTitle": "Noorani Qaida Lesson 2 Part 3 In Urdu/Hindi | Noorania Qaida Lesson 2 Part 3 | learn Quran Online"
+  },
+  {
+    "index": 7,
+    "youtubeId": "vVd1UWxudps",
+    "duration": "4:18",
+    "sourceTitle": "Noorani Qaida Lesson 2 Part 4 In Urdu/Hindi | Noorania Qaida Lesson 2 Part 4 | learn Quran Online"
+  },
+  {
+    "index": 8,
+    "youtubeId": "uES1weXlNN0",
+    "duration": "4:46",
+    "sourceTitle": "Noorani Qaida Lesson 2 Part 5 In Urdu/Hindi |Noorania Qaida Lesson 2 Part 5 | learn Quran Online"
+  },
+  {
+    "index": 9,
+    "youtubeId": "Pi8cObXRmdE",
+    "duration": "3:17",
+    "sourceTitle": "Noorani Qaida Lesson 2 Part 6 In Urdu/Hindi |Noorania Qaida Lesson 2 Part 6 | learn Quran Online"
+  },
+  {
+    "index": 10,
+    "youtubeId": "L9dULBxlCgo",
+    "duration": "3:32",
+    "sourceTitle": "Noorani Qaida Lesson 2 Part 7 In Urdu/Hindi |Noorania Qaida Lesson 2 Part 7 | learn Quran Online"
+  },
+  {
+    "index": 11,
+    "youtubeId": "nsP4_2_OcTI",
+    "duration": "3:16",
+    "sourceTitle": "Noorani Qaida Lesson 2 Part 9 In Urdu/Hindi | Noorania Qaida Lesson 2 Part 9 | learn Quran Online"
+  },
+  {
+    "index": 12,
+    "youtubeId": "Xtizqq5KYwU",
+    "duration": "3:46",
+    "sourceTitle": "Noorani Qaida Lesson 2 Part 8 In Urdu/Hindi |Noorania Qaida Lesson 2 Part 8 | learn Quran Online"
+  },
+  {
+    "index": 13,
+    "youtubeId": "MBDHZp-jk3Q",
+    "duration": "3:37",
+    "sourceTitle": "Noorani Qaida Lesson 1 Full | Noorani Qaida Lesson 1 Complete Urdu/Hindi | learn Quran Online"
+  },
+  {
+    "index": 14,
+    "youtubeId": "lNXBQJQp8gs",
+    "duration": "9:49",
+    "sourceTitle": "Noorani Qaida Lesson 2 Full | Noorani Qaida Lesson 2 Complete Urdu/Hindi | learn Quran Online"
+  },
+  {
+    "index": 15,
+    "youtubeId": "R6MrfK6CQBs",
+    "duration": "5:45",
+    "sourceTitle": "Noorani Qaida Lesson 3 Part 1 in Urdu/Hindi  | Noorani Qaida Lesson 3 Part 1 | learn Quran Online"
+  },
+  {
+    "index": 16,
+    "youtubeId": "wpfMMD7t2uk",
+    "duration": "4:23",
+    "sourceTitle": "Noorani Qaida Lesson 3 Part 2 in Urdu/Hindi  | Noorani Qaida Lesson 3 Part 2 | learn Quran Online"
+  },
+  {
+    "index": 17,
+    "youtubeId": "68imgzWoK60",
+    "duration": "4:23",
+    "sourceTitle": "Noorani Qaida Lesson 3 Part 3 in Urdu/Hindi  | Noorani Qaida Lesson 3 | learn Quran Online"
+  },
+  {
+    "index": 18,
+    "youtubeId": "Owp4NDfW24c",
+    "duration": "11:55",
+    "sourceTitle": "Noorani Qaida Lesson 3 Full In Urdu/Hindi | Noorani Qaida Lesson 3 | learn Quran Online"
+  },
+  {
+    "index": 19,
+    "youtubeId": "Ae2dzEaJ5rg",
+    "duration": "6:03",
+    "sourceTitle": "Noorani Qaida Lesson 4 Part 1 In Urdu/Hindi | Noorani Qaida Lesson 4 | Learn Quran Online"
+  },
+  {
+    "index": 20,
+    "youtubeId": "RxDzmGJYtn8",
+    "duration": "4:48",
+    "sourceTitle": "Noorani Qaida Lesson 4 Part 2 In Urdu/Hindi | Noorani Qaida Lesson 4 | Learn Quran Online"
+  },
+  {
+    "index": 21,
+    "youtubeId": "RiAYhl_bkuY",
+    "duration": "4:23",
+    "sourceTitle": "Noorani Qaida Lesson 4 Part 3 In Urdu/Hindi | Noorani Qaida Lesson 4 | Learn Quran Online"
+  },
+  {
+    "index": 22,
+    "youtubeId": "G3VX933xmb8",
+    "duration": "4:29",
+    "sourceTitle": "Noorani Qaida Lesson 4 Part 4 In Urdu/Hindi | Noorani Qaida Lesson 4 | Learn Quran Online"
+  },
+  {
+    "index": 23,
+    "youtubeId": "NA4P1onyF00",
+    "duration": "5:15",
+    "sourceTitle": "Noorani Qaida Lesson 5 Part 1 In Urdu/Hindi | Noorania Qaida Lesson 5 | Learn Quran Online"
+  },
+  {
+    "index": 24,
+    "youtubeId": "arnBFd-YeaE",
+    "duration": "7:12",
+    "sourceTitle": "Noorani Qaida Lesson 4 Full In Urdu/Hindi | Noorani Qaida Lesson 4 Full | learn Quran Online"
+  },
+  {
+    "index": 25,
+    "youtubeId": "cTzBfan8V1g",
+    "duration": "5:56",
+    "sourceTitle": "Noorani Qaida Lesson 5 Part 2 In Urdu/Hindi | Noorania Qaida Lesson 5 Part 2 | Learn Quran Online"
+  },
+  {
+    "index": 26,
+    "youtubeId": "z5HCbQkgVd0",
+    "duration": "8:07",
+    "sourceTitle": "Noorani Qaida Lesson 5 Full In Urdu/Hindi | Noorani Qaida Lesson 5 | Learn Quran Online"
+  },
+  {
+    "index": 27,
+    "youtubeId": "-2mDvUVSrL4",
+    "duration": "3:38",
+    "sourceTitle": "Noorani Qaida Lesson 6 Part 1 In Urdu/Hindi | Noorani Qaida Lesson 6 in Urdu | learn Quran Online"
+  },
+  {
+    "index": 28,
+    "youtubeId": "1kBZ9IgnoFk",
+    "duration": "6:04",
+    "sourceTitle": "Noorani Qaida Lesson 6 Part 2 In Urdu/Hindi | Noorani Qaida Lesson 6 in Urdu | learn Quran Online"
+  },
+  {
+    "index": 29,
+    "youtubeId": "smbDJCvbedg",
+    "duration": "4:21",
+    "sourceTitle": "Noorani Qaida Lesson 6 Part 3 In Urdu/Hindi | Noorani Qaida Lesson 6 in Urdu | learn Quran Online"
+  },
+  {
+    "index": 30,
+    "youtubeId": "5AvGUxpVcHI",
+    "duration": "5:31",
+    "sourceTitle": "Noorani Qaida Lesson 6 Part 4 In Urdu/Hindi | Noorani Qaida Lesson 6 in Urdu | learn Quran Online"
+  },
+  {
+    "index": 31,
+    "youtubeId": "_JLoKcr9144",
+    "duration": "3:42",
+    "sourceTitle": "Noorani Qaida Lesson 6 Part 5 In Urdu/Hindi | Noorani Qaida Lesson 6 in Urdu | learn Quran Online"
+  },
+  {
+    "index": 32,
+    "youtubeId": "PLg9bAFt1-s",
+    "duration": "10:54",
+    "sourceTitle": "Noorani Qaida Lesson 6 Full In Urdu/Hindi | Noorania Qaida Lesson 6 in Urdu | learn Quran Online"
+  },
+  {
+    "index": 33,
+    "youtubeId": "uVH7XjLf6CM",
+    "duration": "6:56",
+    "sourceTitle": "Noorani Qaida Lesson 7 Part 1 In Urdu/Hindi | Noorania Qaida Lesson 7 Part 1 | learn Quran Online"
+  },
+  {
+    "index": 34,
+    "youtubeId": "DZciiZk417M",
+    "duration": "5:06",
+    "sourceTitle": "Noorani Qaida Lesson 7 Part 2 In Urdu/Hindi | |Noorania Qaida Lesson 7 Part 2 | learn Quran Online"
+  },
+  {
+    "index": 35,
+    "youtubeId": "tHG3-htmU0c",
+    "duration": "4:12",
+    "sourceTitle": "Noorani Qaida Lesson 7 Part 3 In Urdu/Hindi | Noorania Qaida Lesson 7 Part 3 | learn Quran Online"
+  },
+  {
+    "index": 36,
+    "youtubeId": "lJKlw964AOE",
+    "duration": "8:44",
+    "sourceTitle": "Noorani Qaida Lesson 7 Full In Urdu/Hindi | Noorania Qaida Lesson 7 Full | learn Quran Online"
+  },
+  {
+    "index": 37,
+    "youtubeId": "RPntB71y3mo",
+    "duration": "5:16",
+    "sourceTitle": "Noorani Qaida Lesson 8 Part 1 In Urdu/Hindi | Noorania Qaida Lesson 8 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 38,
+    "youtubeId": "fLiMxRKDcQQ",
+    "duration": "3:54",
+    "sourceTitle": "Noorani Qaida Lesson 8 Part 2 In Urdu/Hindi | Noorania Qaida Lesson 8 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 39,
+    "youtubeId": "okDgj3VFT9s",
+    "duration": "11:26",
+    "sourceTitle": "Noorani Qaida Lesson 8 Full In Urdu/Hindi | Noorania Qaida Lesson 8 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 40,
+    "youtubeId": "fcaqooHvdOw",
+    "duration": "4:45",
+    "sourceTitle": "Noorani Qaida Lesson 8 Part 3 In Urdu/Hindi | Noorania Qaida Lesson 8 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 41,
+    "youtubeId": "6pkI_-FbczA",
+    "duration": "4:17",
+    "sourceTitle": "Noorani Qaida Lesson 8 Part 4 In Urdu/Hindi | Noorania Qaida Lesson 8 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 42,
+    "youtubeId": "IOtvF5Qrucg",
+    "duration": "3:12",
+    "sourceTitle": "Noorani Qaida Lesson 8 Part 5 In Urdu/Hindi | Noorania Qaida Lesson 8 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 43,
+    "youtubeId": "f0OxZO3e00k",
+    "duration": "6:05",
+    "sourceTitle": "Noorani Qaida Lesson 9 Part 1 In Urdu/Hindi | Noorania Qaida Lesson 9 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 44,
+    "youtubeId": "3FEtFpf0V9o",
+    "duration": "6:05",
+    "sourceTitle": "Noorani Qaida Lesson 9 Part 2 In Urdu/Hindi | Noorania Qaida Lesson 9 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 45,
+    "youtubeId": "VI8w8gu1h8U",
+    "duration": "6:51",
+    "sourceTitle": "Noorani Qaida Lesson 9 Part 3 In Urdu/Hindi | Noorania Qaida Lesson 9 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 46,
+    "youtubeId": "b3YbGnoOTMs",
+    "duration": "6:06",
+    "sourceTitle": "Noorani Qaida Lesson 9 Part 4 In Urdu/Hindi | Noorania Qaida Lesson 9 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 47,
+    "youtubeId": "enHu_MhIL-0",
+    "duration": "6:45",
+    "sourceTitle": "Noorani Qaida Lesson 9 Part 5 In Urdu/Hindi | Noorania Qaida Lesson 9 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 48,
+    "youtubeId": "fVArnek9VuI",
+    "duration": "5:27",
+    "sourceTitle": "Noorani Qaida Lesson 9 Part 6 In Urdu/Hindi | Noorania Qaida Lesson 9 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 49,
+    "youtubeId": "Z_I4dXSg3uU",
+    "duration": "5:39",
+    "sourceTitle": "Noorani Qaida Lesson 10 Part 1 In Urdu/Hindi | Noorania Qaida Lesson 10 Urdu | learn Quran Online"
+  },
+  {
+    "index": 50,
+    "youtubeId": "J6sUs-qyTIg",
+    "duration": "18:33",
+    "sourceTitle": "Noorani Qaida Lesson 9 Full In Urdu/Hindi | Noorania Qaida Lesson 9 In Urdu | learn Quran Online"
+  },
+  {
+    "index": 51,
+    "youtubeId": "PxW4JLMXfaM",
+    "duration": "4:38",
+    "sourceTitle": "Noorani Qaida Lesson 10 Part 2 In Urdu/Hindi | Noorania Qaida Lesson 10 Urdu | learn Quran Online"
+  },
+  {
+    "index": 52,
+    "youtubeId": "0cUgH3-LTzw",
+    "duration": "5:58",
+    "sourceTitle": "Noorani Qaida Lesson 10 Full In Urdu/Hindi | Noorania Qaida Lesson 10  | learn Quran Online"
+  },
+  {
+    "index": 53,
+    "youtubeId": "8jboAkKBeDc",
+    "duration": "5:50",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 1 in Urdu/Hindi | Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 54,
+    "youtubeId": "rAUgKFXmims",
+    "duration": "6:01",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 2 in Urdu/Hindi |Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 55,
+    "youtubeId": "HSqHl06PrUs",
+    "duration": "6:36",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 3 in Urdu/Hindi |Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 56,
+    "youtubeId": "8i3vdKno8b4",
+    "duration": "5:39",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 4 in Urdu/Hindi |Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 57,
+    "youtubeId": "LP6X79WMvTs",
+    "duration": "7:03",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 5 in Urdu/Hindi |Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 58,
+    "youtubeId": "zsvWODPYySM",
+    "duration": "7:09",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 6 in Urdu/Hindi |Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 59,
+    "youtubeId": "gPuJhd0HpYk",
+    "duration": "7:19",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 7 in Urdu/Hindi |Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 60,
+    "youtubeId": "KA-1uLjYK4M",
+    "duration": "7:42",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 8 in Urdu/Hindi |Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 61,
+    "youtubeId": "r-7Ll7wYpxQ",
+    "duration": "11:22",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 9 in Urdu/Hindi |Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 62,
+    "youtubeId": "ESdvTbIXNtQ",
+    "duration": "13:43",
+    "sourceTitle": "Noorani Qaida Lesson 11 Part 10 in Urdu/Hindi |Noorania Qaida Lesson 11 | learn Quran Online"
+  },
+  {
+    "index": 63,
+    "youtubeId": "PZ-pGw6g_dg",
+    "duration": "25:17",
+    "sourceTitle": "Noorani Qaida Lesson 11 Full in Urdu/Hindi | Noorania Qaida Lesson 11 Full | learn Quran Online"
+  },
+  {
+    "index": 64,
+    "youtubeId": "LvJOtMAeNHw",
+    "duration": "11:05",
+    "sourceTitle": "Noorani Qaida Lesson 12 Part 1 In Urdu/Hindi | Noorani Qaida Lesson 12 | learn Quran Online"
+  },
+  {
+    "index": 65,
+    "youtubeId": "Oc2zP-3-J9o",
+    "duration": "10:26",
+    "sourceTitle": "Noorani Qaida Lesson 12 Part 2 In Urdu/Hindi | Noorani Qaida Lesson 12 | learn Quran Online"
+  },
+  {
+    "index": 66,
+    "youtubeId": "nZau7aXV01Y",
+    "duration": "7:16",
+    "sourceTitle": "Noorani Qaida Lesson 12 Full In Urdu/Hindi | Noorani Qaida Lesson 12 | learn Quran Online"
+  },
+  {
+    "index": 67,
+    "youtubeId": "-kYijTZ-Rt4",
+    "duration": "7:17",
+    "sourceTitle": "Noorani Qaida Lesson 13 Part 1 In Urdu/Hindi | Noorani Qaida Lesson 13 | Learn Quran Online"
+  },
+  {
+    "index": 68,
+    "youtubeId": "GSM7SsHG4p0",
+    "duration": "7:33",
+    "sourceTitle": "Noorani Qaida Lesson 13 Part 2 In Urdu/Hindi | Noorani Qaida Lesson 13 | Learn Quran Online"
+  },
+  {
+    "index": 69,
+    "youtubeId": "SbYDbZkqEhA",
+    "duration": "11:34",
+    "sourceTitle": "Noorani Qaida Lesson 13 Part 3 In Urdu/Hindi | Noorani Qaida Lesson 13 | Learn Quran Online"
+  },
+  {
+    "index": 70,
+    "youtubeId": "N3_kFVIzkDc",
+    "duration": "10:15",
+    "sourceTitle": "Noorani Qaida Lesson 13 Part 4 In Urdu/Hindi | Noorani Qaida Lesson 13 | Learn Quran Online"
+  },
+  {
+    "index": 71,
+    "youtubeId": "N_ll3oAHsMg",
+    "duration": "13:04",
+    "sourceTitle": "Noorani Qaida Lesson 13 Full In Urdu/Hindi | Noorani Qaida Lesson 13 | Learn Quran Online"
+  },
+  {
+    "index": 72,
+    "youtubeId": "2d7Kgfkk_04",
+    "duration": "7:42",
+    "sourceTitle": "Noorani Qaida Lesson 14 | Noorani Qaida Lesson 14 Part 1 In Urdu/Hindi | learn Quran Online"
+  },
+  {
+    "index": 73,
+    "youtubeId": "FqkDy6uCYXQ",
+    "duration": "10:49",
+    "sourceTitle": "Noorani Qaida Lesson 14 | Noorani Qaida Lesson 14 Part 2 In Urdu/Hindi | learn Quran Online"
+  },
+  {
+    "index": 74,
+    "youtubeId": "bJmmSZzctqo",
+    "duration": "6:36",
+    "sourceTitle": "Noorani Qaida Lesson 14 Full | Noorani Qaida Lesson 14 Full In Urdu/Hindi | learn Quran Online"
+  },
+  {
+    "index": 75,
+    "youtubeId": "9TnIPFKYYBo",
+    "duration": "11:14",
+    "sourceTitle": "Noorani Qaida Lesson 15 Full In Urdu/Hindi | Noorani Qaida Lesson 15 | learn Quran Online"
+  },
+  {
+    "index": 76,
+    "youtubeId": "vGYAmzA7C5M",
+    "duration": "6:55",
+    "sourceTitle": "Noorani Qaida Lesson 16 | Noorani Qaida Lesson 16  Part 1 In Urdu/Hindi | Learn Quran Online"
+  },
+  {
+    "index": 77,
+    "youtubeId": "xsgEnAs2yCo",
+    "duration": "8:28",
+    "sourceTitle": "Noorani Qaida Lesson 16 | Noorani Qaida Lesson 16  Part 2 In Urdu/Hindi | Learn Quran Online"
+  },
+  {
+    "index": 78,
+    "youtubeId": "r2btaETmwio",
+    "duration": "9:16",
+    "sourceTitle": "Noorani Qaida Lesson 16 | Noorani Qaida Lesson 16  Part 3 In Urdu/Hindi | Learn Quran Online"
+  },
+  {
+    "index": 79,
+    "youtubeId": "MNzPrBOkADw",
+    "duration": "11:09",
+    "sourceTitle": "Noorani Qaida Lesson 16 | Noorani Qaida Lesson 16  Part 4 In Urdu/Hindi | Learn Quran Online"
+  },
+  {
+    "index": 80,
+    "youtubeId": "bsAwG58VtiE",
+    "duration": "12:05",
+    "sourceTitle": "Noorani Qaida Lesson 16 | Noorani Qaida Lesson 16  Part 5 In Urdu/Hindi | Learn Quran Online"
+  },
+  {
+    "index": 81,
+    "youtubeId": "sip4RJRw1Fg",
+    "duration": "10:34",
+    "sourceTitle": "Noorani Qaida Lesson 16 | Noorani Qaida Lesson 16  Part 6 In Urdu/Hindi | Learn Quran Online"
+  },
+  {
+    "index": 82,
+    "youtubeId": "MLdpzpGSabg",
+    "duration": "26:35",
+    "sourceTitle": "Noorani Qaida Lesson 16 Full | Noorani Qaida Lesson 16 Full In Urdu/Hindi | Learn Quran Online"
+  }
 ];

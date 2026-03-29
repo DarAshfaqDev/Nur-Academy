@@ -2,8 +2,12 @@ import CertificatePage from "./components/CertificatePage";
 import { Component, useState, useEffect, useRef, useCallback } from "react";
 import signatureImage from "./assets/signature-optimized.png";
 import { LISANUL_QURAN_PLAYLIST_ID, LISANUL_QURAN_PLAYLIST_ITEMS } from "./data/lisanulQuranPlaylist";
+import { MADANI_QAIDA_PLAYLIST_ID, MADANI_QAIDA_PLAYLIST_ITEMS } from "./data/madaniQaidaPlaylist";
 import { MUALIM_UL_QURAN_PLAYLIST_ID, MUALIM_UL_QURAN_PLAYLIST_ITEMS } from "./data/mualimUlQuranPlaylist";
 import { NOORANI_QAIDA_PLAYLIST_ID, NOORANI_QAIDA_PLAYLIST_ITEMS } from "./data/nooraniQaidaPlaylist";
+import { PROPHETIC_LIFE_PLAYLIST_ID, PROPHETIC_LIFE_PLAYLIST_ITEMS } from "./data/propheticLifePlaylist";
+import { PROPHETIC_PARENTING_PLAYLIST_ID, PROPHETIC_PARENTING_PLAYLIST_ITEMS } from "./data/propheticParentingPlaylist";
+import { SHORT_SEERAH_PLAYLIST_ID, SHORT_SEERAH_PLAYLIST_ITEMS } from "./data/shortSeerahPlaylist";
 import { TAJWEED_COURSE_PLAYLIST_ID, TAJWEED_COURSE_PLAYLIST_ITEMS } from "./data/tajweedCoursePlaylist";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -523,8 +527,10 @@ const AQIDAH_TRACKS = {
     label: "English",
     note: "English Aqidah lectures and playlist.",
     playlist: "PLdGFY6ZOJ73NLsvp6XBqR11tUMpWjXias",
-    lessonVideoIds: {
-      l5a1: "TlZfpadeYzY",
+    lessonOverrides: {
+      l5a1: {
+        youtubeId: "TlZfpadeYzY",
+      },
     },
   },
   urdu: {
@@ -532,8 +538,97 @@ const AQIDAH_TRACKS = {
     label: "Urdu",
     note: "Urdu Aqidah lectures and playlist.",
     playlist: "PLNzbRwIZdCEby9sHu5X9pT-QC6x4FpIEq",
-    lessonVideoIds: {
-      l5a1: "DwmgvPfzFXs",
+    lessonOverrides: {
+      l5a1: {
+        youtubeId: "DwmgvPfzFXs",
+      },
+    },
+  },
+};
+const HAJJ_UMRAH_DEFAULT_TRACK = "hajj";
+const HAJJ_UMRAH_TRACKS = {
+  hajj: {
+    key: "hajj",
+    label: "Hajj",
+    note: "Hajj-focused route using the full Hajj playlist.",
+    playlist: "PLsF39TzFrYcXgSA2DwjvYK4Y6STrd7JY6",
+    coursePatch: {
+      desc: "Prepare for the rites of Hajj with a guided study path covering preparation, ihram, the major manasik, and essential pilgrim reminders.",
+    },
+    moduleOverrides: {
+      m8a: {
+        title: "Module 1 — Preparing for Hajj",
+        description: "Preparation, intention, and entering ihram for Hajj.",
+      },
+      m8b: {
+        title: "Module 2 — Core Hajj Rites",
+        description: "The main rites of Hajj from arrival to completion.",
+      },
+    },
+    lessonOverrides: {
+      l8a1: {
+        title: "Hajj Overview & Virtues",
+        youtubeId: "cp_ISpIv_wA",
+        description: "An opening Hajj-focused lesson introducing the journey, virtues, and mindset of the pilgrim.",
+      },
+      l8a2: {
+        title: "Conditions, Pillars & Obligations of Hajj",
+        description: "Who Hajj is required upon, what its pillars are, and which obligations must be observed.",
+      },
+      l8a3: {
+        title: "Ihram, Talbiyah & Arrival",
+        description: "Preparing for ihram, making the intention, and beginning the Hajj journey correctly.",
+      },
+      l8b1: {
+        title: "Mina, Arafah & Muzdalifah",
+        description: "The defining stations of Hajj and how the pilgrim moves through them.",
+      },
+      l8b2: {
+        title: "Tawaf, Sa'i & Jamarat",
+        description: "The main acts performed in Makkah and Mina during the days of Hajj.",
+      },
+      l8b3: {
+        title: "Completion & Common Hajj Mistakes",
+        description: "Finishing Hajj properly and avoiding the mistakes many pilgrims make.",
+      },
+    },
+  },
+  umrah: {
+    key: "umrah",
+    label: "Umrah",
+    note: "Focused Umrah route using the provided Umrah lesson.",
+    playlist: "",
+    coursePatch: {
+      desc: "Complete Umrah guide — rulings, duas, and step-by-step instructions according to authentic Sunnah.",
+    },
+    moduleOverrides: {
+      m8a: {
+        title: "Module 1 — Preparing for Umrah",
+        description: "Everything before you travel for Umrah.",
+      },
+      m8b: {
+        title: "Module 2 — Performing Umrah",
+        description: "Step-by-step rituals in Makkah for Umrah.",
+      },
+    },
+    lessonOverrides: {
+      l8a1: {
+        title: "Umrah Overview & Virtues",
+        youtubeId: "VorGBNx9koY",
+        description: "Authentic virtues of Umrah and a practical overview of the journey.",
+      },
+      l8a2: {
+        title: "Conditions, Pillars & Obligations of Umrah",
+        description: "Who must perform Umrah and its essential acts.",
+      },
+      l8a3: {
+        title: "Entering Ihram for Umrah",
+        description: "Miqat stations, ghusl, wearing ihram, and beginning the rite correctly.",
+      },
+      l8b3: {
+        title: "Completion & Common Umrah Mistakes",
+        description: "Hair shortening, exiting ihram, and key Umrah mistakes to avoid.",
+      },
     },
   },
 };
@@ -542,42 +637,54 @@ const qaidaLessonTitle = ({ index, sourceTitle }) => {
     .split("|")
     .map(part => part.replace(/\s+/g, " ").trim())
     .filter(Boolean);
-  const summary = parts.slice(0, 2).join(" / ") || `Noorani Qaida Lesson ${index}`;
+  const summary = parts.slice(0, 2).join(" / ") || `Qaida Lesson ${index}`;
   return `Lesson ${pad(index)} - ${summary}`;
 };
-const QAIDA_MODULE_BLUEPRINT = [
-  { title:"Module 1 - Alphabet Foundations", icon:"🔤", desc:"Arabic letters, dots, and joined-letter basics.", range:[1, 8] },
-  { title:"Module 2 - Harakat Practice", icon:"📝", desc:"Zabar, zer, pesh, and early reading drills.", range:[9, 19] },
-  { title:"Module 3 - Madd and Khada Zabar", icon:"📏", desc:"Madd letters, long vowels, and khada zabar practice.", range:[20, 30] },
-  { title:"Module 4 - Khada Zer to Leen", icon:"🌙", desc:"Khada zer, ulta pesh, and leen letters.", range:[31, 40] },
-  { title:"Module 5 - Takhti and Tanween", icon:"📘", desc:"Takhti lessons and tanween foundations.", range:[41, 51] },
-  { title:"Module 6 - Izhar and Ikhfa", icon:"🎯", desc:"Izhar and ikhfa rules for tanween and noon sakin.", range:[52, 59] },
-  { title:"Module 7 - Sukoon and Qalqalah", icon:"✨", desc:"Jazm, sukoon, qalqalah, and final review videos.", range:[60, 68] },
-];
-const buildQaidaModules = (items) =>
-  QAIDA_MODULE_BLUEPRINT.map((section, idx) => {
-    const [start, end] = section.range;
-    const lessons = items
-      .filter(item => item.index >= start && item.index <= end)
-      .map(item => mkLesson(
+const QAIDA_MODULE_ICONS = ["🔤","📝","📏","🌙","📘","🎯","✨","🧠","📚"];
+const buildQaidaModules = (items, opts={}) =>
+  chunk([...items].sort((a, b) => a.index - b.index), opts.groupSize || 10)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const title = `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`;
+      const description = `${opts.trackLabel || "Qaida"} lessons ${start} to ${end}.`;
+      const lessons = group.map(item => mkLesson(
         `l6${pad(item.index)}`,
         qaidaLessonTitle(item),
         item.youtubeId,
         item.duration,
         {
           free: item.index <= 3,
-          desc: "Imported from Rasul Academy's Noorani Qaida in Urdu YouTube playlist.",
+          desc: `Imported from the ${opts.trackLabel || "Qaida"} YouTube playlist.`,
         }
       ));
 
-    return mkModule(
-      `m6${String.fromCharCode(97 + idx)}`,
-      section.title,
-      section.icon,
-      section.desc,
-      lessons
-    );
-  }).filter(section => section.lessons.length > 0);
+      return mkModule(
+        `m6${String.fromCharCode(97 + idx)}`,
+        title,
+        QAIDA_MODULE_ICONS[idx % QAIDA_MODULE_ICONS.length],
+        description,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const QAIDA_DEFAULT_TRACK = "madani";
+const QAIDA_TRACKS = {
+  madani: {
+    key: "madani",
+    label: "Madani Qaida",
+    note: "Madani Qaida playlist with a full structured lesson set.",
+    playlist: MADANI_QAIDA_PLAYLIST_ID,
+    modules: buildQaidaModules(MADANI_QAIDA_PLAYLIST_ITEMS, { trackLabel: "Madani Qaida" }),
+  },
+  noorani: {
+    key: "noorani",
+    label: "Noorani Qaida",
+    note: "Noorani Qaida playlist with a full structured lesson set.",
+    playlist: NOORANI_QAIDA_PLAYLIST_ID,
+    modules: buildQaidaModules(NOORANI_QAIDA_PLAYLIST_ITEMS, { trackLabel: "Noorani Qaida" }),
+  },
+};
 
 const lisanLessonTitle = ({ index, sourceTitle }) => {
   if (sourceTitle === "[Private video]") {
@@ -744,6 +851,113 @@ const buildTajweedModules = (items) => {
     );
   }).filter(section => section.lessons.length > 0);
 };
+const shortSeerahLessonTitle = ({ index, sourceTitle }) => {
+  const raw = String(sourceTitle || "").replace(/\s+/g, " ").trim();
+  if (/don't miss out/i.test(raw)) return `Lesson ${pad(index)} - Series Introduction`;
+
+  const cleaned = raw
+    .replace(/\[EP\d+\]\s*/i, "")
+    .replace(/- Story Of Muhammad.*$/i, "")
+    .replace(/#SeerahSeries.*$/i, "")
+    .replace(/-+\s*(Dr\.\s*)?Yasir Qadhi.*$/i, "")
+    .replace(/Muhammad\s*\((?:ï·º|ﷺ)\)/gi, "Muhammad")
+    .replace(/ï·º|ﷺ/g, "")
+    .replace(/â/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return `Lesson ${pad(index)} - ${cleaned || "Short Seerah Lesson"}`;
+};
+const buildShortSeerahModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 8)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l11${pad(item.index)}`,
+        shortSeerahLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 3,
+          desc: "Imported from the short Seerah YouTube playlist.",
+        }
+      ));
+
+      return mkModule(
+        `m11${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Episodes ${pad(start)}-${pad(end)}`,
+        ["🌅","🕌","🛤️","🏙️","⭐","📜"][idx % 6],
+        `A short Seerah playlist segment covering episodes ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const propheticLifeLessonTitle = ({ index, sourceTitle }) => {
+  const cleaned = String(sourceTitle || "")
+    .replace(/\s+/g, " ")
+    .replace(/^\d+\s*-\s*/, "")
+    .replace(/\s*-\s*The Prophetic Life in Focus.*$/i, "")
+    .replace(/\s*-\s*Sh(?:aykh|\.)\s*Abdul-Rahim Reasat.*$/i, "")
+    .trim();
+
+  return `Lesson ${pad(index)} - ${cleaned || "Prophetic Life Lesson"}`;
+};
+const buildPropheticLifeModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 10)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l12${pad(item.index)}`,
+        propheticLifeLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 2,
+          desc: "Imported from the Prophetic Life in Focus YouTube playlist.",
+        }
+      ));
+
+      return mkModule(
+        `m12${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["🕋","🌅","🕌","🛤️","🏙️","⚔️","📜","✨","🕊️","⭐"][idx % 10],
+        `Prophetic Life in Focus lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const propheticParentingLessonTitle = ({ index, sourceTitle }) => {
+  const raw = String(sourceTitle || "").replace(/\s+/g, " ").trim();
+  if (/q&a/i.test(raw)) return `Lesson ${pad(index)} - Parenting Q&A`;
+
+  const cleaned = raw
+    .replace(/^Prophetic Parenting:\s*/i, "")
+    .replace(/^40 Hadiths on Raising Righteous Muslim Children\s*-\s*/i, "")
+    .replace(/\s*-\s*Shaykh Faraz Rabbani.*$/i, "")
+    .trim();
+
+  return `Lesson ${pad(index)} - ${cleaned || "Prophetic Parenting Session"}`;
+};
+const buildPropheticParentingModules = (items) => [
+  mkModule(
+    "m13a",
+    "Module 1 - Foundations and Guidance",
+    "👨‍👩‍👧‍👦",
+    "The main Prophetic Parenting sessions plus the concluding Q&A.",
+    [...items].sort((a, b) => a.index - b.index).map(item => mkLesson(
+      `l13${pad(item.index)}`,
+      propheticParentingLessonTitle(item),
+      item.youtubeId,
+      item.duration,
+      {
+        free: item.index <= 2,
+        desc: "Imported from the Prophetic Parenting YouTube playlist.",
+      }
+    ))
+  ),
+];
 
 const COURSES = [
   {
@@ -845,6 +1059,40 @@ const COURSES = [
     ],
   },
   {
+    id:11, slug:"short-seerah-course",
+    title:"Short Seerah Course", titleAr:"السيرة المختصرة",
+    instructor:"Dr. Yasir Qadhi", category:"Seerah", level:"Beginner",
+    rating:4.9, students:2180, price:0, isFree:true,
+    badge:"41 Lessons", badgeC:C.gold,
+    thumb:"🕊️", color:"#315B4C",
+    desc:"A shorter Seerah journey through the life of Prophet Muhammad, organized from a compact playlist for learners who want a faster overview.",
+    playlist:SHORT_SEERAH_PLAYLIST_ID,
+    modules:buildShortSeerahModules(SHORT_SEERAH_PLAYLIST_ITEMS),
+  },
+  {
+    id:12, slug:"prophetic-life",
+    title:"Prophetic (SAW) Life", titleAr:"الحياة النبوية",
+    instructor:"Shaykh Abdul-Rahim Reasat", category:"Seerah", level:"Intermediate",
+    rating:4.9, students:2480, price:0, isFree:true,
+    badge:"100 Lessons", badgeC:C.gold,
+    thumb:"🕯️", color:"#3C5B6F",
+    desc:"A detailed Prophetic Life in Focus series tracing the blessed life of the Messenger from Arabia before Islam through the major stages of his mission.",
+    playlist:PROPHETIC_LIFE_PLAYLIST_ID,
+    modules:buildPropheticLifeModules(PROPHETIC_LIFE_PLAYLIST_ITEMS),
+  },
+  {
+    id:13, slug:"prophetic-parenting",
+    title:"Prophetic Parenting", titleAr:"التربية النبوية",
+    instructor:"Shaykh Faraz Rabbani", category:"Family", level:"All Levels",
+    rating:4.9, students:1280, price:0, isFree:true,
+    badge:"5 Sessions", badgeC:C.gold,
+    thumb:"👨‍👩‍👧",
+    color:"#6B4F3B",
+    desc:"A concise Prophetic Parenting series on raising righteous Muslim children through forty hadith-based reflections and a closing Q&A.",
+    playlist:PROPHETIC_PARENTING_PLAYLIST_ID,
+    modules:buildPropheticParentingModules(PROPHETIC_PARENTING_PLAYLIST_ITEMS),
+  },
+  {
     id:5, slug:"aqidah-course",
     title:"Aqidah Course", titleAr:"علم العقيدة",
     instructor:"Sheikh Bilal Philips", category:"Aqidah", level:"Beginner",
@@ -857,7 +1105,7 @@ const COURSES = [
     trackOptions:AQIDAH_TRACKS,
     modules:[
       mkModule("m5a","Module 1 — Tawheed","☝️","Pure Monotheism — the most important knowledge",[
-        mkLesson("l5a1","Introduction to Aqidah",AQIDAH_TRACKS.english.lessonVideoIds.l5a1,"15:00",{free:true,desc:"Why Aqidah is the foundation of everything."}),
+        mkLesson("l5a1","Introduction to Aqidah",AQIDAH_TRACKS.english.lessonOverrides.l5a1.youtubeId,"15:00",{free:true,desc:"Why Aqidah is the foundation of everything."}),
         mkLesson("l5a2","Tawheed Al-Rububiyyah","DEMO","22:00",{desc:"Oneness of Allah's Lordship."}),
         mkLesson("l5a3","Tawheed Al-Uluhiyyah","DEMO","24:00",{desc:"Oneness in worship — the central message of all prophets."}),
         mkLesson("l5a4","Allah's Names & Attributes","DEMO","26:00",{desc:"What the Names and Attributes mean and do not mean.",res:["99 Names of Allah.pdf"]}),
@@ -872,14 +1120,16 @@ const COURSES = [
   },
   {
     id:6, slug:"learn-qaida",
-    title:"Noorani Qaida", titleAr:"تعلم القاعدة النورانية",
-    instructor:"Rasul Academy", category:"Quran", level:"Beginner",
+    title:"Qaida Course", titleAr:"دورة القاعدة",
+    instructor:"Madani & Noorani Instructors", category:"Quran", level:"Beginner",
     rating:4.9, students:5480, price:0, isFree:true,
-    badge:"68 Videos", badgeC:C.gold,
+    badge:"2 Tracks", badgeC:C.gold,
     thumb:"🌟", color:C.em,
-    desc:"A full 68-video Noorani Qaida series in Urdu covering letters, harakat, madd, tanween, ikhfa, sukoon, and qalqalah.",
-    playlist:NOORANI_QAIDA_PLAYLIST_ID,
-    modules:buildQaidaModules(NOORANI_QAIDA_PLAYLIST_ITEMS),
+    desc:"Choose either the Madani Qaida or Noorani Qaida study path from one course card and follow the full lesson library for your selected qaida.",
+    playlist:QAIDA_TRACKS.madani.playlist,
+    defaultTrack:QAIDA_DEFAULT_TRACK,
+    trackOptions:QAIDA_TRACKS,
+    modules:QAIDA_TRACKS.madani.modules,
   },
   {
     id:7, slug:"hadith-studies",
@@ -904,24 +1154,26 @@ const COURSES = [
     ],
   },
   {
-    id:8, slug:"small-hajj",
-    title:"Small Hajj (Umrah)", titleAr:"العمرة المباركة",
+    id:8, slug:"hajj-umrah",
+    title:"Hajj & Umrah", titleAr:"الحج والعمرة",
     instructor:"Sheikh Assim Al-Hakeem", category:"Fiqh", level:"All Levels",
     rating:4.9, students:3890, price:0, isFree:true,
     badge:"Free", badgeC:C.em,
     thumb:"🕋", color:"#0D4F3C",
-    desc:"Complete Umrah guide — rulings, duas, and step-by-step instructions according to authentic Sunnah.",
-    playlist:"YOUR_PLAYLIST_ID_HERE",
+    desc:"Choose either a Hajj or Umrah learning path from one course card, then study the rulings and practical steps for your selected pilgrimage.",
+    playlist:HAJJ_UMRAH_TRACKS.hajj.playlist,
+    defaultTrack:HAJJ_UMRAH_DEFAULT_TRACK,
+    trackOptions:HAJJ_UMRAH_TRACKS,
     modules:[
-      mkModule("m8a","Module 1 — Preparing","🧳","Everything before you travel",[
-        mkLesson("l8a1","Virtues of Umrah","DEMO","15:00",{free:true,desc:"Authentic Hadith on the reward of Umrah."}),
-        mkLesson("l8a2","Conditions, Pillars & Obligations","DEMO","20:00",{desc:"Who must perform Umrah and its essential acts.",res:["Umrah Checklist.pdf"]}),
-        mkLesson("l8a3","Entering Ihram","DEMO","22:00",{desc:"Miqat stations, ghusl, wearing Ihram, Talbiyah.",res:["Ihram Guide.pdf"]}),
+      mkModule("m8a","Module 1 — Preparing for Pilgrimage","🧳","Preparation, intention, and entering ihram.",[
+        mkLesson("l8a1","Pilgrimage Overview & Virtues","cp_ISpIv_wA","15:00",{free:true,desc:"An opening overview of the chosen pilgrimage path and its virtues."}),
+        mkLesson("l8a2","Conditions, Pillars & Obligations","DEMO","20:00",{desc:"The key conditions, pillars, and obligations every pilgrim should know.",res:["Pilgrimage Checklist.pdf"]}),
+        mkLesson("l8a3","Entering Ihram","DEMO","22:00",{desc:"Miqat stations, ghusl, wearing ihram, and beginning the rite correctly.",res:["Ihram Guide.pdf"]}),
       ]),
-      mkModule("m8b","Module 2 — Performing Umrah","🕋","Step-by-step rituals in Makkah",[
-        mkLesson("l8b1","Tawaf — Circling the Ka'bah","DEMO","25:00",{desc:"Seven circuits, direction, and duas.",res:["Tawaf Duas.pdf"]}),
-        mkLesson("l8b2","Sa'i — Safa & Marwa","DEMO","22:00",{desc:"Hagar's blessed walk — correct performance.",res:["Sa'i Guide.pdf"]}),
-        mkLesson("l8b3","Halq, Completion & Common Mistakes","DEMO","20:00",{desc:"Hair shortening, exiting Ihram, key mistakes to avoid.",res:["Complete Dua Booklet.pdf"]}),
+      mkModule("m8b","Module 2 — Main Rituals","🕋","The central acts of the selected pilgrimage journey.",[
+        mkLesson("l8b1","Main Rituals — Step by Step","DEMO","25:00",{desc:"Follow the main rites in sequence with practical guidance.",res:["Tawaf Duas.pdf"]}),
+        mkLesson("l8b2","Movement Between Sacred Sites","DEMO","22:00",{desc:"Understand the essential movement, order, and key actions of the journey.",res:["Sa'i Guide.pdf"]}),
+        mkLesson("l8b3","Completion & Common Mistakes","DEMO","20:00",{desc:"How to complete the pilgrimage correctly and avoid common mistakes.",res:["Complete Dua Booklet.pdf"]}),
       ]),
     ],
   },
@@ -951,13 +1203,21 @@ const COURSES = [
     ],
   },
 ];
-const applyTrackToModules = (modules=[], lessonVideoIds={}) => modules.map(mod => ({
-  ...mod,
-  lessons: mod.lessons.map(lesson => ({
-    ...lesson,
-    youtubeId: lessonVideoIds[lesson.id] || lesson.youtubeId,
-  })),
-}));
+const applyTrackToModules = (modules=[], lessonOverrides={}, moduleOverrides={}) => modules.map(mod => {
+  const modulePatch = moduleOverrides[mod.id] || {};
+  return {
+    ...mod,
+    ...modulePatch,
+    lessons: mod.lessons.map(lesson => {
+      const lessonPatch = lessonOverrides[lesson.id] || {};
+      return {
+        ...lesson,
+        ...lessonPatch,
+        youtubeId: lessonPatch.youtubeId || lesson.youtubeId,
+      };
+    }),
+  };
+});
 const selectCourseTrackKey = (course, preferredTrackKey) => {
   if (!course?.trackOptions) return null;
   const keys = Object.keys(course.trackOptions);
@@ -981,11 +1241,14 @@ const resolveCourse = (courseLike) => {
 
   return {
     ...baseCourse,
+    ...(track.coursePatch || {}),
     selectedTrackKey: trackKey,
     selectedTrackLabel: track.label,
     selectedTrackNote: track.note || "",
     playlist: track.playlist || baseCourse.playlist,
-    modules: applyTrackToModules(baseCourse.modules, track.lessonVideoIds || {}),
+    modules: track.modules?.length
+      ? track.modules
+      : applyTrackToModules(baseCourse.modules, track.lessonOverrides || {}, track.moduleOverrides || {}),
   };
 };
 
@@ -1035,7 +1298,7 @@ class AppCrashBoundary extends Component {
   }
 }
 
-const CATS = ["All","Quran","Arabic","Seerah","Aqidah","Hadith","Fiqh"];
+const CATS = ["All","Quran","Arabic","Seerah","Aqidah","Hadith","Fiqh","Family"];
 
 // Helpers
 const flatLessons = (course) => {
@@ -2081,7 +2344,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
             </div>
             {trackChoices.length > 0 && (
               <div style={{marginBottom:14}}>
-                <div style={{fontSize:".72rem",fontWeight:700,color:C.textM,letterSpacing:".06em",textTransform:"uppercase",marginBottom:8}}>Choose Language Track</div>
+                <div style={{fontSize:".72rem",fontWeight:700,color:C.textM,letterSpacing:".06em",textTransform:"uppercase",marginBottom:8}}>Choose Course Option</div>
                 <div style={{display:"grid",gap:8}}>
                   {trackChoices.map(([key, track]) => {
                     const active = courseData.selectedTrackKey === key;
@@ -2113,8 +2376,8 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
                 </div>
                 <div style={{marginTop:8,fontSize:".69rem",lineHeight:1.55,color:C.textL}}>
                   {enrolled
-                    ? `You are enrolled in the ${courseData.selectedTrackLabel} Aqidah track.`
-                    : "Choose the Aqidah language track your learners should follow before enrolling."}
+                    ? `You are enrolled in the ${courseData.selectedTrackLabel} option for this course.`
+                    : "Choose which option the learner should follow before enrolling in this course."}
                 </div>
               </div>
             )}
@@ -2134,7 +2397,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
             <div style={{marginTop:13,fontSize:".73rem",color:C.textL}}>
               {["📦 "+courseData.modules.length+" modules","📚 "+tot+" lessons","📝 Personal notes","🔥 Streak tracking","📜 Certificate"].map(f=><div key={f} style={{padding:"3px 0"}}>{f}</div>)}
             </div>
-            {courseData.playlist!=="YOUR_PLAYLIST_ID_HERE"&&(
+            {courseData.playlist && courseData.playlist!=="YOUR_PLAYLIST_ID_HERE"&&(
               <a href={`https://www.youtube.com/playlist?list=${courseData.playlist}`} target="_blank" rel="noreferrer"
                 style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:11,padding:"7px",borderRadius:8,background:"#FF000012",color:"#CC0000",fontSize:".74rem",fontWeight:600,textDecoration:"none",border:"1px solid #FF000020"}}>
                 ▶ View YouTube Playlist
@@ -2891,6 +3154,10 @@ const LoginPage = ({ setPage, onLogin }) => {
       setLoading(false);
     }
   };
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!loading && form.email && form.password) go();
+  };
 
   return (
     <div className="page" style={{paddingTop:64,minHeight:"100vh",background:`linear-gradient(160deg,${C.emD},${C.em})`,display:"flex",alignItems:"center",justifyContent:"center",padding:"64px 20px 36px",position:"relative"}}>
@@ -2904,20 +3171,26 @@ const LoginPage = ({ setPage, onLogin }) => {
           <p style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".88rem"}}>دخول آمن للمتعلمين والإدارة</p>
         </div>
         <Divider/>
-        <div style={{marginTop:18}}>
+        <form onSubmit={handleSubmit} autoComplete="on" style={{marginTop:18}}>
           {[["Email","email","you@example.com","📧"],["Password","password","Enter your password","🔒"]].map(([label,type,placeholder,icon])=>(
             <div key={label} style={{marginBottom:13}}>
               <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
               <div style={{position:"relative"}}>
                 <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}>{icon}</span>
-                <input type={type} value={form[type]} onChange={e=>setForm(prev => ({ ...prev, [type]: e.target.value }))}
+                <input
+                  type={type}
+                  name={type === "email" ? "email" : "password"}
+                  autoComplete={type === "email" ? "username" : "current-password"}
+                  autoCapitalize="none"
+                  value={form[type]}
+                  onChange={e=>setForm(prev => ({ ...prev, [type]: e.target.value }))}
                   placeholder={placeholder}
                   style={{width:"100%",padding:"10px 12px 10px 35px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".85rem",background:C.cream}}/>
               </div>
             </div>
           ))}
           {error&&<div style={{marginBottom:12,fontSize:".78rem",color:C.red}}>{error}</div>}
-          <button className="btn" onClick={go} disabled={loading || !form.email || !form.password}
+          <button type="submit" className="btn" disabled={loading || !form.email || !form.password}
             style={{width:"100%",justifyContent:"center",padding:12,borderRadius:11,background:loading?C.textL:`linear-gradient(135deg,${C.em},${C.gold})`,color:"white",fontSize:".93rem",fontWeight:700,boxShadow:"0 4px 16px rgba(11,82,64,.24)"}}>
             {loading?<><div style={{width:15,height:15,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"white",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>Signing in…</>:"Sign In →"}
           </button>
@@ -2931,7 +3204,7 @@ const LoginPage = ({ setPage, onLogin }) => {
             </div>
             <div style={{fontSize:".68rem",color:C.textL,marginTop:6}}>Access data is currently stored in this browser until your hosted backend is connected.</div>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
@@ -2968,6 +3241,10 @@ const RegisterPage = ({ setPage, onRegister }) => {
       setLoading(false);
     }
   };
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!loading) go();
+  };
 
   return (
     <div className="page" style={{paddingTop:64,minHeight:"100vh",background:`linear-gradient(160deg,${C.emD},${C.em})`,display:"flex",alignItems:"center",justifyContent:"center",padding:"64px 20px 36px",position:"relative"}}>
@@ -2978,12 +3255,16 @@ const RegisterPage = ({ setPage, onRegister }) => {
           <p style={{fontFamily:"'Amiri',serif",color:C.gold}}>إنشاء حساب طالب</p>
         </div>
         <Divider/>
-        <div style={{marginTop:18}}>
+        <form onSubmit={handleSubmit} autoComplete="on" style={{marginTop:18}}>
           <div className="auth-name-grid grid-2" style={{gridTemplateColumns:"1fr 1fr",gap:11,marginBottom:11}}>
             {[["First Name","firstName","Ahmad"],["Last Name","lastName","Al-Farsi"]].map(([label,key,placeholder])=>(
               <div key={label}>
                 <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
-                <input value={form[key]} onChange={e=>setForm(prev => ({ ...prev, [key]: e.target.value }))}
+                <input
+                  name={key}
+                  autoComplete={key === "firstName" ? "given-name" : "family-name"}
+                  value={form[key]}
+                  onChange={e=>setForm(prev => ({ ...prev, [key]: e.target.value }))}
                   placeholder={placeholder}
                   style={{width:"100%",padding:"8px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".83rem",background:C.cream}}/>
               </div>
@@ -2992,7 +3273,13 @@ const RegisterPage = ({ setPage, onRegister }) => {
           {[["Email","email","you@example.com"],["Password","password","Minimum 8 characters"]].map(([label,key,placeholder])=>(
             <div key={label} style={{marginBottom:11}}>
               <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
-              <input type={key==="password"?"password":"email"} value={form[key]} onChange={e=>setForm(prev => ({ ...prev, [key]: e.target.value }))}
+              <input
+                type={key==="password"?"password":"email"}
+                name={key}
+                autoComplete={key==="password" ? "new-password" : "email"}
+                autoCapitalize="none"
+                value={form[key]}
+                onChange={e=>setForm(prev => ({ ...prev, [key]: e.target.value }))}
                 placeholder={placeholder}
                 style={{width:"100%",padding:"8px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".83rem",background:C.cream}}/>
             </div>
@@ -3002,7 +3289,7 @@ const RegisterPage = ({ setPage, onRegister }) => {
             <span style={{fontSize:".76rem",color:C.textM,lineHeight:1.5}}>I agree to the <span style={{color:C.em}}>Terms</span> and <span style={{color:C.em}}>Privacy Policy</span></span>
           </label>
           {error&&<div style={{marginBottom:12,fontSize:".78rem",color:C.red}}>{error}</div>}
-          <button className="btn" onClick={go} disabled={loading}
+          <button type="submit" className="btn" disabled={loading}
             style={{width:"100%",justifyContent:"center",padding:12,borderRadius:11,background:loading?C.textL:`linear-gradient(135deg,${C.gold},${C.goldL})`,color:"white",fontSize:".93rem",fontWeight:700,boxShadow:"0 4px 16px rgba(201,168,76,.26)"}}>
             {loading?<><div style={{width:15,height:15,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"white",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>Creating…</>:"🌟 Create Free Account"}
           </button>
@@ -3012,7 +3299,7 @@ const RegisterPage = ({ setPage, onRegister }) => {
           <div style={{marginTop:11,padding:"8px 12px",background:`${C.gold}0E`,borderRadius:8,border:`1px solid ${C.gold}22`,textAlign:"center"}}>
             <div style={{fontSize:".68rem",color:C.textM}}>Learner accounts are stored in this browser for now until your hosted authentication system is connected.</div>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
