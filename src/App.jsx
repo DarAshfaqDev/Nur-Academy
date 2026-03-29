@@ -365,6 +365,25 @@ const Auth = {
     ls.set(K.SESSION, { id:user.id });
     return user;
   },
+  resetPassword: async ({ email, password }) => {
+    await Auth.ensureSeeded();
+    const normalized = normalizeEmail(email);
+    if (!normalized) throw new Error("Please enter your email.");
+    if (String(password || "").trim().length < 8) throw new Error("Password must be at least 8 characters.");
+
+    const users = Auth.users();
+    const matchIndex = users.findIndex(user => user.email === normalized);
+    if (matchIndex < 0) throw new Error("No account found for that email on this browser.");
+
+    const nextUsers = [...users];
+    nextUsers[matchIndex] = {
+      ...nextUsers[matchIndex],
+      passwordHash: await hashText(password),
+    };
+
+    ls.set(K.USERS, nextUsers);
+    return nextUsers[matchIndex];
+  },
   updateCurrentProfile: ({ name, email, country, language }) => {
     const session = Auth.session();
     if (!session?.id) throw new Error("You need to sign in first.");
@@ -1522,7 +1541,7 @@ const Divider = ({ col=C.gold }) => (
   </div>
 );
 
-const Btn = ({ children, v="primary", onClick, style={}, size="md", icon, disabled=false }) => {
+const Btn = ({ children, v="primary", onClick, style={}, size="md", icon, disabled=false, type="button" }) => {
   const p = {sm:"7px 14px",md:"10px 22px",lg:"14px 34px"};
   const f = {sm:".78rem",md:".86rem",lg:".96rem"};
   const V = {
@@ -1535,7 +1554,7 @@ const Btn = ({ children, v="primary", onClick, style={}, size="md", icon, disabl
     danger:  {background:C.red,color:"#fff",borderRadius:8},
   };
   return (
-    <button className="btn" disabled={disabled} onClick={onClick}
+    <button type={type} className="btn" disabled={disabled} onClick={onClick}
       style={{padding:p[size],fontSize:f[size],...V[v],...style}}>
       {icon&&<span>{icon}</span>}{children}
     </button>
@@ -3139,10 +3158,16 @@ const LoginPage = ({ setPage, onLogin }) => {
   const [form, setForm] = useState({ email:"", password:"" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [resetForm, setResetForm] = useState({ email:"", password:"", confirm:"" });
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState("");
 
   const go = async () => {
     setLoading(true);
     setError("");
+    setNotice("");
     try {
       const user = await Auth.login(form);
       await wait(250);
@@ -3157,6 +3182,39 @@ const LoginPage = ({ setPage, onLogin }) => {
   const handleSubmit = (event) => {
     event.preventDefault();
     if (!loading && form.email && form.password) go();
+  };
+  const toggleForgot = () => {
+    setForgotOpen(open => !open);
+    setResetError("");
+    setNotice("");
+    setResetForm(prev => ({
+      email: prev.email || form.email,
+      password: "",
+      confirm: "",
+    }));
+  };
+  const handleResetPassword = async () => {
+    setResetError("");
+    setNotice("");
+    if (!resetForm.email.trim()) return setResetError("Please enter the account email.");
+    if (resetForm.password.trim().length < 8) return setResetError("New password must be at least 8 characters.");
+    if (resetForm.password !== resetForm.confirm) return setResetError("Password confirmation does not match.");
+
+    setResetLoading(true);
+    try {
+      const updatedUser = await Auth.resetPassword({
+        email: resetForm.email,
+        password: resetForm.password,
+      });
+      setForm({ email: updatedUser.email, password: "" });
+      setResetForm({ email: updatedUser.email, password: "", confirm: "" });
+      setForgotOpen(false);
+      setNotice("Password updated on this browser. Sign in with your new password.");
+    } catch (err) {
+      setResetError(err.message);
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   return (
@@ -3189,6 +3247,70 @@ const LoginPage = ({ setPage, onLogin }) => {
               </div>
             </div>
           ))}
+          <div style={{display:"flex",justifyContent:"flex-end",marginTop:-2,marginBottom:12}}>
+            <button
+              type="button"
+              onClick={toggleForgot}
+              style={{border:"none",background:"none",padding:0,color:C.em,fontSize:".75rem",fontWeight:700,cursor:"pointer"}}
+            >
+              {forgotOpen ? "Hide reset form" : "Forgot password?"}
+            </button>
+          </div>
+          {forgotOpen&&(
+            <div style={{marginBottom:13,padding:"12px",borderRadius:10,background:`${C.em}08`,border:`1px solid ${C.em}18`}}>
+              <div style={{fontSize:".75rem",fontWeight:700,color:C.emD,marginBottom:4}}>Reset Password On This Browser</div>
+              <div style={{fontSize:".72rem",color:C.textL,lineHeight:1.6,marginBottom:10}}>
+                Enter the account email and choose a new password. Until a hosted backend is connected, this reset works only for accounts stored in this browser.
+              </div>
+              <div style={{marginBottom:9}}>
+                <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Email</label>
+                <input
+                  type="email"
+                  name="reset-email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  value={resetForm.email}
+                  onChange={e=>setResetForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="you@example.com"
+                  style={{width:"100%",padding:"9px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".82rem",background:"white"}}
+                />
+              </div>
+              <div style={{marginBottom:9}}>
+                <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>New Password</label>
+                <input
+                  type="password"
+                  name="reset-password"
+                  autoComplete="new-password"
+                  value={resetForm.password}
+                  onChange={e=>setResetForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Minimum 8 characters"
+                  style={{width:"100%",padding:"9px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".82rem",background:"white"}}
+                />
+              </div>
+              <div style={{marginBottom:9}}>
+                <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Confirm Password</label>
+                <input
+                  type="password"
+                  name="reset-confirm-password"
+                  autoComplete="new-password"
+                  value={resetForm.confirm}
+                  onChange={e=>setResetForm(prev => ({ ...prev, confirm: e.target.value }))}
+                  placeholder="Re-enter new password"
+                  style={{width:"100%",padding:"9px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".82rem",background:"white"}}
+                />
+              </div>
+              {resetError&&<div style={{marginBottom:10,fontSize:".76rem",color:C.red}}>{resetError}</div>}
+              <Btn
+                v="outline"
+                onClick={handleResetPassword}
+                disabled={resetLoading}
+                style={{width:"100%",justifyContent:"center"}}
+              >
+                {resetLoading ? "Updating password..." : "Reset Password"}
+              </Btn>
+            </div>
+          )}
+          {notice&&<div style={{marginBottom:12,fontSize:".78rem",color:C.green}}>{notice}</div>}
           {error&&<div style={{marginBottom:12,fontSize:".78rem",color:C.red}}>{error}</div>}
           <button type="submit" className="btn" disabled={loading || !form.email || !form.password}
             style={{width:"100%",justifyContent:"center",padding:12,borderRadius:11,background:loading?C.textL:`linear-gradient(135deg,${C.em},${C.gold})`,color:"white",fontSize:".93rem",fontWeight:700,boxShadow:"0 4px 16px rgba(11,82,64,.24)"}}>
