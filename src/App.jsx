@@ -8,6 +8,7 @@ import { NOORANI_QAIDA_PLAYLIST_ID, NOORANI_QAIDA_PLAYLIST_ITEMS } from "./data/
 import { PROPHETIC_LIFE_PLAYLIST_ID, PROPHETIC_LIFE_PLAYLIST_ITEMS } from "./data/propheticLifePlaylist";
 import { PROPHETIC_PARENTING_PLAYLIST_ID, PROPHETIC_PARENTING_PLAYLIST_ITEMS } from "./data/propheticParentingPlaylist";
 import { SHORT_SEERAH_PLAYLIST_ID, SHORT_SEERAH_PLAYLIST_ITEMS } from "./data/shortSeerahPlaylist";
+import { SISTERS_TAJWEED_PLAYLIST_ID, SISTERS_TAJWEED_PLAYLIST_ITEMS } from "./data/sistersTajweedPlaylist";
 import { TAJWEED_COURSE_PLAYLIST_ID, TAJWEED_COURSE_PLAYLIST_ITEMS } from "./data/tajweedCoursePlaylist";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -870,6 +871,39 @@ const buildTajweedModules = (items) => {
     );
   }).filter(section => section.lessons.length > 0);
 };
+const sistersTajweedLessonTitle = ({ index }) => {
+  if (index === 2) return `Lesson ${pad(index)} - Course Trailer`;
+  const day = index > 2 ? index - 1 : 1;
+  return `Lesson ${pad(index)} - 180 Days Challenge Day ${pad(day)}`;
+};
+const SISTERS_TAJWEED_MODULE_ICONS = ["🧕","📖","✨","🌙","🪷","📝","🧠","🎯","🕊️","🏁"];
+const buildSistersTajweedModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 10)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l14${pad(item.index)}`,
+        sistersTajweedLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 3,
+          desc: item.index === 2
+            ? "Trailer lesson imported from Tayyba Quran Academy's long Tajweed course playlist."
+            : "Imported from Tayyba Quran Academy's Learn Tajweed in 180 Days playlist for ladies and girls.",
+        }
+      ));
+
+      return mkModule(
+        `m14${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        SISTERS_TAJWEED_MODULE_ICONS[idx % SISTERS_TAJWEED_MODULE_ICONS.length],
+        `Sisters-focused Tajweed lessons ${start} to ${end} from Tayyba Quran Academy.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
 const shortSeerahLessonTitle = ({ index, sourceTitle }) => {
   const raw = String(sourceTitle || "").replace(/\s+/g, " ").trim();
   if (/don't miss out/i.test(raw)) return `Lesson ${pad(index)} - Series Introduction`;
@@ -1022,6 +1056,17 @@ const COURSES = [
     desc:"A complete Urdu Tajweed video series covering terminology, noon sakinah and tanween, meem sakin, idgham families, hamza rules, and advanced Quran-reading cases.",
     playlist:TAJWEED_COURSE_PLAYLIST_ID,
     modules:buildTajweedModules(TAJWEED_COURSE_PLAYLIST_ITEMS),
+  },
+  {
+    id:14, slug:"tajweed-180-days",
+    title:"Learn Tajweed in 180 Days", titleAr:"تعلم التجويد في ١٨٠ يوما",
+    instructor:"Tayyba Quran Academy", category:"Quran", level:"Beginner",
+    rating:4.9, students:1860, price:0, isFree:true,
+    badge:"For Sisters", badgeC:"#A24D6E",
+    thumb:"🧕", color:"#7A4157",
+    desc:"A long-form Tajweed journey especially suitable for ladies and girls, helping them build daily Quran-reading consistency through guided lessons from Tayyba Quran Academy.",
+    playlist:SISTERS_TAJWEED_PLAYLIST_ID,
+    modules:buildSistersTajweedModules(SISTERS_TAJWEED_PLAYLIST_ITEMS),
   },
   {
     id:3, slug:"arabic-language",
