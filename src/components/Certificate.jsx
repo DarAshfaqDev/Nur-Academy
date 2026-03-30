@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import QRCode from "react-qr-code";
 import signatureImage from "../assets/signature-optimized.png";
+import HadiyaSupportCard from "./HadiyaSupportCard";
 
 const LOGO_SRC = `${import.meta.env.BASE_URL}favicon.png`;
 const BISMILLAH = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ";
@@ -63,6 +64,82 @@ const slugify = (value, fallback) => {
   return normalized || fallback;
 };
 
+export const exportCertificatePdf = async ({
+  element,
+  courseName = "certificate",
+  studentName = "student",
+  onFallbackPrint,
+} = {}) => {
+  if (!element) return false;
+
+  const originalWidth = element.style.width;
+  const originalMaxWidth = element.style.maxWidth;
+  const originalBoxShadow = element.style.boxShadow;
+
+  try {
+    if (document.fonts?.ready) await document.fonts.ready;
+    await Promise.all(Array.from(element.querySelectorAll("img")).map(waitForImage));
+
+    const html2canvasModule = await import("html2canvas");
+    const jspdfModule = await import("jspdf");
+    const html2canvas = html2canvasModule.default || html2canvasModule;
+    const JsPdf = jspdfModule.jsPDF || jspdfModule.default?.jsPDF || jspdfModule.default;
+
+    if (!html2canvas || !JsPdf) throw new Error("PDF tools failed to load.");
+
+    element.style.width = "1120px";
+    element.style.maxWidth = "1120px";
+    element.style.boxShadow = "none";
+
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#f7ecd2",
+      logging: false,
+    });
+
+    const pdf = new JsPdf({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 6;
+    const maxWidth = pageWidth - margin * 2;
+    const maxHeight = pageHeight - margin * 2;
+    let renderWidth = maxWidth;
+    let renderHeight = (canvas.height * renderWidth) / canvas.width;
+
+    if (renderHeight > maxHeight) {
+      renderHeight = maxHeight;
+      renderWidth = (canvas.width * renderHeight) / canvas.height;
+    }
+
+    const x = (pageWidth - renderWidth) / 2;
+    const y = (pageHeight - renderHeight) / 2;
+    const imageData = canvas.toDataURL("image/png");
+
+    pdf.addImage(imageData, "PNG", x, y, renderWidth, renderHeight, undefined, "FAST");
+
+    const courseSlug = slugify(courseName, "certificate");
+    const studentSlug = slugify(studentName, "student");
+    pdf.save(`${courseSlug}-${studentSlug}-certificate.pdf`);
+    return true;
+  } catch (error) {
+    console.error("Certificate PDF export failed:", error);
+    if (typeof onFallbackPrint === "function") onFallbackPrint();
+    return false;
+  } finally {
+    element.style.width = originalWidth;
+    element.style.maxWidth = originalMaxWidth;
+    element.style.boxShadow = originalBoxShadow;
+  }
+};
+
 function Certificate({ user, course, completion, onPrint }) {
   const frameRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -82,77 +159,22 @@ function Certificate({ user, course, completion, onPrint }) {
   const handlePrint = async () => {
     if (isExporting || !frameRef.current) return;
 
-    const frame = frameRef.current;
-    const originalWidth = frame.style.width;
-    const originalMaxWidth = frame.style.maxWidth;
-    const originalBoxShadow = frame.style.boxShadow;
-
     setIsExporting(true);
 
     try {
-      if (document.fonts?.ready) await document.fonts.ready;
-      await Promise.all(Array.from(frame.querySelectorAll("img")).map(waitForImage));
-
-      const html2canvasModule = await import("html2canvas");
-      const jspdfModule = await import("jspdf");
-      const html2canvas = html2canvasModule.default || html2canvasModule;
-      const JsPdf = jspdfModule.jsPDF || jspdfModule.default?.jsPDF || jspdfModule.default;
-
-      if (!html2canvas || !JsPdf) throw new Error("PDF tools failed to load.");
-
-      frame.style.width = "1120px";
-      frame.style.maxWidth = "1120px";
-      frame.style.boxShadow = "none";
-
-      await new Promise((resolve) => window.requestAnimationFrame(resolve));
-
-      const canvas = await html2canvas(frame, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#f7ecd2",
-        logging: false,
+      await exportCertificatePdf({
+        element: frameRef.current,
+        courseName,
+        studentName,
+        onFallbackPrint: () => {
+          if (typeof onPrint === "function") {
+            onPrint();
+            return;
+          }
+          window.print();
+        },
       });
-
-      const pdf = new JsPdf({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
-
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 6;
-      const maxWidth = pageWidth - margin * 2;
-      const maxHeight = pageHeight - margin * 2;
-      let renderWidth = maxWidth;
-      let renderHeight = (canvas.height * renderWidth) / canvas.width;
-
-      if (renderHeight > maxHeight) {
-        renderHeight = maxHeight;
-        renderWidth = (canvas.width * renderHeight) / canvas.height;
-      }
-
-      const x = (pageWidth - renderWidth) / 2;
-      const y = (pageHeight - renderHeight) / 2;
-      const imageData = canvas.toDataURL("image/png");
-
-      pdf.addImage(imageData, "PNG", x, y, renderWidth, renderHeight, undefined, "FAST");
-
-      const courseSlug = slugify(courseName, "certificate");
-      const studentSlug = slugify(studentName, "student");
-      pdf.save(`${courseSlug}-${studentSlug}-certificate.pdf`);
-      return;
-    } catch (error) {
-      console.error("Certificate PDF export failed:", error);
-      if (typeof onPrint === "function") {
-        onPrint();
-        return;
-      }
-      window.print();
     } finally {
-      frame.style.width = originalWidth;
-      frame.style.maxWidth = originalMaxWidth;
-      frame.style.boxShadow = originalBoxShadow;
       setIsExporting(false);
     }
   };
@@ -893,6 +915,8 @@ function Certificate({ user, course, completion, onPrint }) {
       >
         {isExporting ? "Preparing PDF..." : "Download / Print PDF"}
       </button>
+
+      <HadiyaSupportCard />
     </div>
   );
 }

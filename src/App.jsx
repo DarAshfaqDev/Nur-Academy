@@ -1,7 +1,10 @@
-import CertificatePage from "./components/CertificatePage";
+import CertificatePage, { exportCertificatePdf } from "./components/CertificatePage";
 import { Component, useState, useEffect, useRef, useCallback } from "react";
+import { createRoot } from "react-dom/client";
 import signatureImage from "./assets/signature-optimized.png";
+import HadiyaSupportCard from "./components/HadiyaSupportCard";
 import { LISANUL_QURAN_PLAYLIST_ID, LISANUL_QURAN_PLAYLIST_ITEMS } from "./data/lisanulQuranPlaylist";
+import { ISLAMIC_BASICS_PLAYLIST_ID, ISLAMIC_BASICS_PLAYLIST_ITEMS } from "./data/islamicBasicsPlaylist";
 import { MADANI_QAIDA_PLAYLIST_ID, MADANI_QAIDA_PLAYLIST_ITEMS } from "./data/madaniQaidaPlaylist";
 import { MUALIM_UL_QURAN_PLAYLIST_ID, MUALIM_UL_QURAN_PLAYLIST_ITEMS } from "./data/mualimUlQuranPlaylist";
 import { NOORANI_QAIDA_PLAYLIST_ID, NOORANI_QAIDA_PLAYLIST_ITEMS } from "./data/nooraniQaidaPlaylist";
@@ -172,6 +175,7 @@ const K = {
   USERS: "nur_users_v2",
   SESSION: "nur_session_v2",
   DATA: "nur_data_v2",
+  COURSES: "nur_courses_v1",
 };
 const clearNurBrowserData = () => {
   ls.remove(K.USERS);
@@ -279,6 +283,8 @@ const Auth = {
       joinedAt: dayKey(),
       country: "",
       language: "English / Arabic",
+      blockedAt: null,
+      blockedReason: "",
       passwordHash: PRIMARY_ADMIN_PASSWORD_HASH,
     };
 
@@ -302,6 +308,8 @@ const Auth = {
         joinedAt: currentAdmin.joinedAt || adminProfile.joinedAt,
         country: currentAdmin.country || adminProfile.country,
         language: currentAdmin.language || adminProfile.language,
+        blockedAt: null,
+        blockedReason: "",
         passwordHash: PRIMARY_ADMIN_PASSWORD_HASH,
       };
     } else {
@@ -336,6 +344,9 @@ const Auth = {
 
     const passwordHash = await hashText(password);
     if (passwordHash !== user.passwordHash) throw new Error("Incorrect email or password.");
+    if (user.blockedAt) {
+      throw new Error(user.blockedReason || "This account has been blocked by an administrator.");
+    }
 
     ls.set(K.SESSION, { id:user.id });
     Auth.ensureUserData(user.id);
@@ -356,6 +367,8 @@ const Auth = {
       joinedAt: dayKey(),
       country: "",
       language: "English / Arabic",
+      blockedAt: null,
+      blockedReason: "",
       passwordHash: await hashText(password),
     };
 
@@ -382,6 +395,111 @@ const Auth = {
       passwordHash: await hashText(password),
     };
 
+    ls.set(K.USERS, nextUsers);
+    return nextUsers[matchIndex];
+  },
+  createUser: async ({ name, email, password, role="student", country="", language="English / Arabic" }) => {
+    await Auth.ensureSeeded();
+    if (!Auth.isAdmin()) throw new Error("Only administrators can add users.");
+
+    const cleanedName = String(name || "").replace(/\s+/g, " ").trim();
+    const normalizedEmail = normalizeEmail(email);
+    const cleanedPassword = String(password || "");
+    const cleanedRole = role === "admin" ? "admin" : "student";
+
+    if (!cleanedName) throw new Error("Please enter a name.");
+    if (!normalizedEmail) throw new Error("Please enter an email.");
+    if (cleanedPassword.length < 8) throw new Error("Password must be at least 8 characters.");
+    if (Auth.users().some(user => user.email === normalizedEmail)) {
+      throw new Error("An account with that email already exists.");
+    }
+
+    const user = {
+      id: newUserId(),
+      name: cleanedName,
+      email: normalizedEmail,
+      role: cleanedRole,
+      joinedAt: dayKey(),
+      country: String(country || "").trim(),
+      language: String(language || "English / Arabic").trim() || "English / Arabic",
+      blockedAt: null,
+      blockedReason: "",
+      passwordHash: await hashText(cleanedPassword),
+    };
+
+    ls.set(K.USERS, [...Auth.users(), user]);
+    Auth.ensureUserData(user.id);
+    return user;
+  },
+  setRole: (userId, nextRole) => {
+    if (!Auth.isAdmin()) throw new Error("Only administrators can change roles.");
+    const role = nextRole === "admin" ? "admin" : "student";
+    const session = Auth.session();
+    const users = Auth.users();
+    const match = users.find(user => user.id === userId);
+    if (!match) throw new Error("User not found.");
+    if (match.id === "nur_admin_primary" && role !== "admin") {
+      throw new Error("The primary admin role cannot be removed.");
+    }
+    if (session?.id === userId && role !== "admin") {
+      throw new Error("You cannot remove admin access from the account you are using right now.");
+    }
+
+    const nextUsers = users.map(user => user.id === userId ? { ...user, role } : user);
+    ls.set(K.USERS, nextUsers);
+    return nextUsers.find(user => user.id === userId) || null;
+  },
+  setBlocked: (userId, blocked, reason="") => {
+    if (!Auth.isAdmin()) throw new Error("Only administrators can block users.");
+    const session = Auth.session();
+    const users = Auth.users();
+    const match = users.find(user => user.id === userId);
+    if (!match) throw new Error("User not found.");
+    if (match.id === "nur_admin_primary") {
+      throw new Error("The primary admin account cannot be blocked.");
+    }
+    if (session?.id === userId) {
+      throw new Error("You cannot block the account you are using right now.");
+    }
+
+    const nextUsers = users.map(user => user.id === userId ? {
+      ...user,
+      blockedAt: blocked ? dayKey() : null,
+      blockedReason: blocked ? (String(reason || "").trim() || "Blocked by admin.") : "",
+    } : user);
+    ls.set(K.USERS, nextUsers);
+    return nextUsers.find(user => user.id === userId) || null;
+  },
+  deleteUser: (userId) => {
+    if (!Auth.isAdmin()) throw new Error("Only administrators can delete users.");
+    const session = Auth.session();
+    if (userId === "nur_admin_primary") throw new Error("The primary admin account cannot be deleted.");
+    if (session?.id === userId) throw new Error("You cannot delete the account you are using right now.");
+
+    const users = Auth.users();
+    const match = users.find(user => user.id === userId);
+    if (!match) throw new Error("User not found.");
+
+    ls.set(K.USERS, users.filter(user => user.id !== userId));
+    const allData = readAllUserData();
+    delete allData[userId];
+    ls.set(K.DATA, allData);
+    return true;
+  },
+  resetUserPassword: async (userId, password) => {
+    if (!Auth.isAdmin()) throw new Error("Only administrators can reset passwords.");
+    const cleanedPassword = String(password || "");
+    if (cleanedPassword.length < 8) throw new Error("Password must be at least 8 characters.");
+
+    const users = Auth.users();
+    const matchIndex = users.findIndex(user => user.id === userId);
+    if (matchIndex < 0) throw new Error("User not found.");
+
+    const nextUsers = [...users];
+    nextUsers[matchIndex] = {
+      ...nextUsers[matchIndex],
+      passwordHash: await hashText(cleanedPassword),
+    };
     ls.set(K.USERS, nextUsers);
     return nextUsers[matchIndex];
   },
@@ -904,6 +1022,58 @@ const buildSistersTajweedModules = (items) =>
       );
     })
     .filter(section => section.lessons.length > 0);
+const islamicBasicsLessonTitle = ({ index, sourceTitle }) => {
+  const cleaned = String(sourceTitle || "")
+    .replace(/\s+/g, " ")
+    .replace(/^Beginners Guide to Islam Part \d+:\s*/i, "")
+    .replace(/\s*\|\s*Beginners Guide to Islam$/i, "")
+    .replace(/^Islam\s*\|\s*/i, "")
+    .replace(/^How to say\s*/i, "")
+    .replace(/^LEARN\s*-\s*/i, "")
+    .replace(/^LEARN\s+/i, "")
+    .replace(/^Arabic WORD by WORD\s*\|\s*/i, "")
+    .replace(/^Word by Word\s*-\s*/i, "")
+    .replace(/\s*-\s*WORD BY WORD$/i, "")
+    .replace(/\s*-\s*Word by Word\s*-\s*/i, " / ")
+    .replace(/\s*-\s*Word by Word.*$/i, "")
+    .replace(/\s*&\s*Follow Along Actions\s*\(For Beginners\)\s*$/i, "")
+    .replace(/\s*\|\s*Word-by-Word Breakdown for Beginners\s*$/i, "")
+    .replace(/\s*\|\s*/g, " / ")
+    .trim();
+
+  return `Lesson ${pad(index)} - ${cleaned || "Islamic Basics"}`;
+};
+const ISLAMIC_BASICS_MODULE_BLUEPRINT = [
+  { title:"Module 1 - Belief and Conversion", icon:"☪️", desc:"Core beliefs, pillars of faith, and embracing Islam.", range:[1, 3] },
+  { title:"Module 2 - Purification and Salah", icon:"💧", desc:"Purification, wudu, ghusl, and the foundations of prayer.", range:[4, 5] },
+  { title:"Module 3 - The Five Daily Prayers", icon:"🕌", desc:"Beginner walk-throughs for Fajr, Dhuhr, Asr, Maghrib, and Isha.", range:[6, 10] },
+  { title:"Module 4 - Mosque and Essential Recitations", icon:"📖", desc:"Your first mosque visit, opening dua, Al-Fatihah, and a short surah.", range:[11, 14] },
+  { title:"Module 5 - Prayer Words and Closing Duas", icon:"🤲", desc:"Bowing, prostration, tashahhud, and salat al-Ibrahimiyyah.", range:[15, 18] },
+];
+const buildIslamicBasicsModules = (items) =>
+  ISLAMIC_BASICS_MODULE_BLUEPRINT.map((section, idx) => {
+    const [start, end] = section.range;
+    const lessons = items
+      .filter(item => item.index >= start && item.index <= end)
+      .map(item => mkLesson(
+        `l9${pad(item.index)}`,
+        islamicBasicsLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 3,
+          desc: "Imported from Think Arabic's Beginners Guide to Islam YouTube playlist.",
+        }
+      ));
+
+    return mkModule(
+      `m9${String.fromCharCode(97 + idx)}`,
+      section.title,
+      section.icon,
+      section.desc,
+      lessons
+    );
+  }).filter(section => section.lessons.length > 0);
 const shortSeerahLessonTitle = ({ index, sourceTitle }) => {
   const raw = String(sourceTitle || "").replace(/\s+/g, " ").trim();
   if (/don't miss out/i.test(raw)) return `Lesson ${pad(index)} - Series Introduction`;
@@ -1244,27 +1414,13 @@ const COURSES = [
   {
     id:9, slug:"islamic-basics",
     title:"Islamic Basics", titleAr:"أساسيات الإسلام",
-    instructor:"Sheikh Ibrahim Dremali", category:"Fiqh", level:"Beginner",
+    instructor:"Think Arabic", category:"Fiqh", level:"Beginner",
     rating:4.8, students:6100, price:0, isFree:true,
-    badge:"Foundation", badgeC:C.em,
+    badge:"18 Lessons", badgeC:C.gold,
     thumb:"☪️", color:C.em,
-    desc:"Every Muslim's essential guide — Five Pillars, prayer, fasting, halal/haram basics, and daily Islamic practice.",
-    playlist:"YOUR_PLAYLIST_ID_HERE",
-    modules:[
-      mkModule("m9a","Module 1 — Five Pillars","🏛️","The structure of Islamic practice",[
-        mkLesson("l9a1","Shahadah — The Declaration","DEMO","18:00",{free:true,desc:"The most important statement a person can make.",res:["Shahadah Explanation.pdf"]}),
-        mkLesson("l9a2","Salah — The Prayer","DEMO","35:00",{desc:"Complete guide to 5 daily prayers — times, movements, duas.",res:["Prayer Guide.pdf","Prayer Times Chart.pdf"]}),
-        mkLesson("l9a3","Zakat — Obligatory Charity","DEMO","22:00",{desc:"Nisab, calculation, and who receives Zakat."}),
-        mkLesson("l9a4","Sawm — Ramadan Fasting","DEMO","24:00",{desc:"Rules of fasting, what breaks it, spiritual dimensions."}),
-        mkLesson("l9a5","Hajj — The Pilgrimage Overview","DEMO","20:00",{desc:"Conditions, pillars, and profound meaning of Hajj."}),
-      ]),
-      mkModule("m9b","Module 2 — Daily Islamic Life","🌙","Practical Islam from morning to night",[
-        mkLesson("l9b1","Morning & Evening Adhkar","DEMO","25:00",{free:true,desc:"Prophetic remembrances that protect your day.",res:["Morning Evening Adhkar.pdf"]}),
-        mkLesson("l9b2","Halal & Haram Essentials","DEMO","22:00",{desc:"Food, relationships, and business — the basics."}),
-        mkLesson("l9b3","Islamic Manners (Adab)","DEMO","20:00",{desc:"How a Muslim speaks, dresses, eats, and interacts."}),
-        mkLesson("l9b4","Death & What Comes After","DEMO","22:00",{desc:"Preparing for death, janazah rulings, comfort in grief.",res:["Janazah Guide.pdf"]}),
-      ]),
-    ],
+    desc:"A beginner-friendly YouTube course covering Islamic beliefs, conversion, purification, the five daily prayers, first mosque steps, and essential recitations for new learners.",
+    playlist:ISLAMIC_BASICS_PLAYLIST_ID,
+    modules:buildIslamicBasicsModules(ISLAMIC_BASICS_PLAYLIST_ITEMS),
   },
 ];
 const applyTrackToModules = (modules=[], lessonOverrides={}, moduleOverrides={}) => modules.map(mod => {
@@ -1282,6 +1438,81 @@ const applyTrackToModules = (modules=[], lessonOverrides={}, moduleOverrides={})
     }),
   };
 });
+const CATEGORY_OPTIONS = ["Quran","Arabic","Seerah","Aqidah","Hadith","Fiqh","Family"];
+const LEVEL_OPTIONS = ["Beginner","Intermediate","Advanced","All Levels"];
+const slugifyCourseValue = (value, fallback="course") => String(value || "")
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "") || fallback;
+const buildAdminStarterModules = ({ id, playlist="", firstVideoId="", firstLessonTitle="", firstLessonDuration="" }) => [
+  mkModule(
+    `m${id}a`,
+    "Module 1 - Getting Started",
+    "📘",
+    "Starter lesson added from the admin panel.",
+    [
+      mkLesson(
+        `l${id}01`,
+        firstLessonTitle || "Lesson 01 - Course Introduction",
+        firstVideoId || "DEMO",
+        firstLessonDuration || "15:00",
+        {
+          free: true,
+          desc: playlist
+            ? "Added from the admin panel. Use the linked playlist for the full lesson series."
+            : "Added from the admin panel.",
+        }
+      ),
+    ]
+  ),
+];
+const normalizeCustomCourse = (raw={}) => {
+  const id = safeNum(raw.id, 0);
+  const title = String(raw.title || "").trim();
+  if (!id || !title) return null;
+
+  const price = Math.max(0, safeNum(raw.price, 0));
+  const course = {
+    id,
+    slug: slugifyCourseValue(raw.slug || title, `course-${id}`),
+    title,
+    titleAr: String(raw.titleAr || "").trim(),
+    instructor: String(raw.instructor || "Nur Academy").trim(),
+    category: CATEGORY_OPTIONS.includes(raw.category) ? raw.category : "Fiqh",
+    level: LEVEL_OPTIONS.includes(raw.level) ? raw.level : "Beginner",
+    rating: Math.max(0, safeNum(raw.rating, 4.8)),
+    students: Math.max(0, safeNum(raw.students, 0)),
+    price,
+    isFree: raw.isFree !== false && price <= 0,
+    badge: String(raw.badge || "Custom").trim() || "Custom",
+    badgeC: String(raw.badgeC || C.gold).trim() || C.gold,
+    thumb: String(raw.thumb || "📘").trim() || "📘",
+    color: String(raw.color || C.em).trim() || C.em,
+    desc: String(raw.desc || "Custom course added from the admin panel.").trim() || "Custom course added from the admin panel.",
+    playlist: String(raw.playlist || "").trim(),
+    firstVideoId: String(raw.firstVideoId || "").trim(),
+    firstLessonTitle: String(raw.firstLessonTitle || "").trim(),
+    firstLessonDuration: String(raw.firstLessonDuration || "").trim(),
+    createdAt: String(raw.createdAt || dayKey()).trim() || dayKey(),
+    adminManaged: true,
+  };
+
+  course.modules = Array.isArray(raw.modules) && raw.modules.length
+    ? raw.modules
+    : buildAdminStarterModules(course);
+
+  return course;
+};
+const readCustomCourses = () => ls.get(K.COURSES, []).map(normalizeCustomCourse).filter(Boolean);
+const writeCustomCourses = (updater) => {
+  const current = clone(ls.get(K.COURSES, []));
+  const nextValue = typeof updater === "function" ? updater(current) || current : updater;
+  const nextCourses = Array.isArray(nextValue) ? nextValue : current;
+  ls.set(K.COURSES, nextCourses);
+  return nextCourses.map(normalizeCustomCourse).filter(Boolean);
+};
+const getCourseCatalog = () => [...COURSES, ...readCustomCourses()];
+const getNextCourseId = () => getCourseCatalog().reduce((max, course) => Math.max(max, safeNum(course.id, 0)), 0) + 1;
 const selectCourseTrackKey = (course, preferredTrackKey) => {
   if (!course?.trackOptions) return null;
   const keys = Object.keys(course.trackOptions);
@@ -1292,7 +1523,7 @@ const selectCourseTrackKey = (course, preferredTrackKey) => {
 };
 const resolveCourse = (courseLike) => {
   if (!courseLike) return null;
-  const baseCourse = COURSES.find(course =>
+  const baseCourse = getCourseCatalog().find(course =>
     course.id === courseLike.id ||
     (course.slug && course.slug === courseLike.slug)
   ) || courseLike;
@@ -1314,6 +1545,82 @@ const resolveCourse = (courseLike) => {
       ? track.modules
       : applyTrackToModules(baseCourse.modules, track.lessonOverrides || {}, track.moduleOverrides || {}),
   };
+};
+const AdminDB = {
+  users: () => [...Auth.users()].sort((a, b) => {
+    if (a.role === b.role) return a.name.localeCompare(b.name);
+    return a.role === "admin" ? -1 : 1;
+  }),
+  customCourses: () => readCustomCourses(),
+  createCourse: (form={}) => {
+    if (!Auth.isAdmin()) throw new Error("Only administrators can add courses.");
+    const title = String(form.title || "").trim();
+    if (!title) throw new Error("Please enter a course title.");
+
+    const rawCourse = {
+      id: getNextCourseId(),
+      slug: slugifyCourseValue(form.slug || title, `course-${Date.now()}`),
+      title,
+      titleAr: String(form.titleAr || "").trim(),
+      instructor: String(form.instructor || "Nur Academy").trim() || "Nur Academy",
+      category: CATEGORY_OPTIONS.includes(form.category) ? form.category : "Fiqh",
+      level: LEVEL_OPTIONS.includes(form.level) ? form.level : "Beginner",
+      rating: 5,
+      students: 0,
+      price: 0,
+      isFree: true,
+      badge: String(form.badge || "Custom").trim() || "Custom",
+      badgeC: String(form.badgeC || C.gold).trim() || C.gold,
+      thumb: String(form.thumb || "📘").trim() || "📘",
+      color: String(form.color || C.em).trim() || C.em,
+      desc: String(form.desc || "Custom course added from the admin panel.").trim() || "Custom course added from the admin panel.",
+      playlist: String(form.playlist || "").trim(),
+      firstVideoId: String(form.firstVideoId || "").trim(),
+      firstLessonTitle: String(form.firstLessonTitle || "").trim(),
+      firstLessonDuration: String(form.firstLessonDuration || "").trim(),
+      createdAt: dayKey(),
+    };
+
+    const course = normalizeCustomCourse(rawCourse);
+    writeCustomCourses(courses => [...courses, course]);
+    return course;
+  },
+  deleteCourse: (courseId) => {
+    if (!Auth.isAdmin()) throw new Error("Only administrators can delete courses.");
+    const customCourses = readCustomCourses();
+    const target = customCourses.find(course => course.id === courseId);
+    if (!target) throw new Error("Only custom admin-added courses can be deleted.");
+
+    writeCustomCourses(courses => courses.filter(course => safeNum(course.id, 0) !== courseId));
+
+    const allData = readAllUserData();
+    Object.keys(allData).forEach(userId => {
+      const state = mergeUserState(allData[userId] || {});
+      const courseKey = String(courseId);
+      state.enrollments = state.enrollments.filter(id => id !== courseId);
+      delete state.courseTracks[courseKey];
+      delete state.progress[courseKey];
+      delete state.completions[courseKey];
+      Object.keys(state.watch).forEach(key => {
+        if (key.startsWith(`${courseKey}:`)) delete state.watch[key];
+      });
+      allData[userId] = state;
+    });
+    ls.set(K.DATA, allData);
+    return true;
+  },
+  certificates: () => {
+    const usersById = new Map(Auth.users().map(user => [user.id, user]));
+    const coursesById = new Map(getCourseCatalog().map(course => [String(course.id), course]));
+    return Object.entries(readAllUserData()).flatMap(([userId, raw]) => {
+      const data = mergeUserState(raw || {});
+      return Object.entries(data.completions || {}).map(([courseId, completion]) => ({
+        user: usersById.get(userId) || { name:"Removed User", email:"", id:userId },
+        course: coursesById.get(courseId) || { id:courseId, title:"Removed Course", titleAr:"" },
+        completion,
+      }));
+    }).sort((a, b) => String(b.completion?.completedAt || "").localeCompare(String(a.completion?.completedAt || "")));
+  },
 };
 
 class AppCrashBoundary extends Component {
@@ -1362,7 +1669,7 @@ class AppCrashBoundary extends Component {
   }
 }
 
-const CATS = ["All","Quran","Arabic","Seerah","Aqidah","Hadith","Fiqh","Family"];
+const CATS = ["All", ...CATEGORY_OPTIONS];
 
 // Helpers
 const flatLessons = (course) => {
@@ -1410,7 +1717,7 @@ const loadYouTubeAPI = () => {
   return window.__nurYtApiPromise;
 };
 
-const printCertificate = (course, user, completion) => {
+const openCertificatePrintWindow = (course, user, completion) => {
   if (typeof window === "undefined" || !course || !user || !completion) return;
   const popup = window.open("", "_blank", "noopener,noreferrer,width=1100,height=780");
   if (!popup) return;
@@ -1559,6 +1866,54 @@ const printCertificate = (course, user, completion) => {
   popup.document.close();
   popup.focus();
   window.setTimeout(() => popup.print(), 350);
+};
+
+const printCertificate = async (course, user, completion) => {
+  if (typeof window === "undefined" || !course || !user || !completion) return;
+
+  const mountNode = document.createElement("div");
+  mountNode.style.position = "fixed";
+  mountNode.style.left = "-20000px";
+  mountNode.style.top = "0";
+  mountNode.style.width = "1200px";
+  mountNode.style.pointerEvents = "none";
+  mountNode.setAttribute("aria-hidden", "true");
+  document.body.appendChild(mountNode);
+
+  const root = createRoot(mountNode);
+
+  try {
+    root.render(
+      <CertificatePage
+        user={user}
+        course={course}
+        completion={completion}
+        onPrint={() => openCertificatePrintWindow(course, user, completion)}
+      />
+    );
+
+    await wait(80);
+    await new Promise(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+
+    const frame = mountNode.querySelector(".certificate-frame");
+    if (!frame) {
+      openCertificatePrintWindow(course, user, completion);
+      return;
+    }
+
+    await exportCertificatePdf({
+      element: frame,
+      courseName: course.selectedTrackLabel ? `${course.title} (${course.selectedTrackLabel} Track)` : course.title,
+      studentName: user.name,
+      onFallbackPrint: () => openCertificatePrintWindow(course, user, completion),
+    });
+  } catch (error) {
+    console.error("Certificate export bootstrap failed:", error);
+    openCertificatePrintWindow(course, user, completion);
+  } finally {
+    root.unmount();
+    mountNode.remove();
+  }
 };
 
 // ─── Atoms ────────────────────────────────────────────────────────────────────
@@ -2139,6 +2494,7 @@ const Footer = () => (
 
 // ─── HOME ─────────────────────────────────────────────────────────────────────
 const HomePage = ({ setPage, setCourse }) => {
+  const courseCatalog = getCourseCatalog();
   const [ti, setTi] = useState(0);
   const testimonials = [
     {name:"Aisha Rahman",role:"Student, USA",text:"Nur Academy transformed my relationship with the Quran. The Tajweed course was exceptional — I now recite with real confidence. JazakAllahu Khayran!",av:"A"},
@@ -2172,7 +2528,7 @@ const HomePage = ({ setPage, setCourse }) => {
               <Btn size="lg" onClick={()=>setPage("register")} style={{background:"rgba(255,255,255,.1)",color:"white",border:"1px solid rgba(255,255,255,.3)",borderRadius:10}}>Join Free Today</Btn>
             </div>
             <div className="home-stat-row" style={{display:"flex",gap:28}}>
-              {[{v:`${COURSES.filter(c=>c.isFree).length}`,l:"Free Courses"},{v:String(COURSES.length),l:"Total Courses"},{v:String(COURSES.reduce((a,c)=>a+c.modules.length,0)),l:"Modules"},{v:"🔥",l:"Streak System"}].map((s,i)=>(
+              {[{v:`${courseCatalog.filter(c=>c.isFree).length}`,l:"Free Courses"},{v:String(courseCatalog.length),l:"Total Courses"},{v:String(courseCatalog.reduce((a,c)=>a+c.modules.length,0)),l:"Modules"},{v:"🔥",l:"Streak System"}].map((s,i)=>(
                 <div key={i} style={{textAlign:"center"}}>
                   <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.4rem",fontWeight:700,color:C.gold}}>{s.v}</div>
                   <div style={{fontSize:".68rem",color:"rgba(255,255,255,.48)",textTransform:"uppercase",letterSpacing:".05em"}}>{s.l}</div>
@@ -2191,7 +2547,7 @@ const HomePage = ({ setPage, setCourse }) => {
                   <div style={{color:C.goldL,fontSize:".7rem"}}>Complete a lesson daily to keep it</div>
                 </div>
               </div>
-              {COURSES.slice(0,2).map((c,i)=>(
+              {courseCatalog.slice(0,2).map((c,i)=>(
                 <div key={i} style={{background:"rgba(255,255,255,.05)",borderRadius:10,padding:"11px 14px",marginBottom:8,border:"1px solid rgba(255,255,255,.08)"}}>
                   <div style={{display:"flex",gap:9,alignItems:"center",marginBottom:7}}>
                     <span style={{fontSize:"1.2rem"}}>{c.thumb}</span>
@@ -2240,10 +2596,10 @@ const HomePage = ({ setPage, setCourse }) => {
             <p style={{color:C.textM,maxWidth:440,margin:"9px auto",fontSize:".88rem",lineHeight:1.7}}>Each course has YouTube video lessons, structured modules, and personal note-taking.</p>
           </div>
           <div className="grid-3" style={{gridTemplateColumns:"repeat(3,1fr)",gap:20}}>
-            {COURSES.slice(0,6).map(c=><CourseCard key={c.id} course={c} onClick={c=>{setCourse(c);setPage("course-detail");}}/>)}
+            {courseCatalog.slice(0,6).map(c=><CourseCard key={c.id} course={c} onClick={c=>{setCourse(c);setPage("course-detail");}}/>)}
           </div>
           <div style={{textAlign:"center",marginTop:32}}>
-            <Btn size="lg" v="outline" onClick={()=>setPage("courses")}>{`View All ${COURSES.length} Courses →`}</Btn>
+            <Btn size="lg" v="outline" onClick={()=>setPage("courses")}>{`View All ${courseCatalog.length} Courses →`}</Btn>
           </div>
         </div>
       </section>
@@ -2279,11 +2635,12 @@ const HomePage = ({ setPage, setCourse }) => {
 
 // ─── COURSES ──────────────────────────────────────────────────────────────────
 const CoursesPage = ({ setPage, setCourse }) => {
+  const courseCatalog = getCourseCatalog();
   const [cat, setCat] = useState("All");
   const [q,   setQ  ] = useState("");
   const [pr,  setPr ] = useState("All");
 
-  const filtered = COURSES.filter(c =>
+  const filtered = courseCatalog.filter(c =>
     (cat==="All"||c.category===cat) &&
     (c.title.toLowerCase().includes(q.toLowerCase())||c.desc.toLowerCase().includes(q.toLowerCase())) &&
     (pr==="All"||(pr==="Free"?c.isFree:!c.isFree))
@@ -2530,7 +2887,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
 };
 
 // ─── LESSON PLAYER ────────────────────────────────────────────────────────────
-const LessonPage = ({ lessonData, setPage, setLesson }) => {
+const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
   const sourceCourse = resolveCourse(lessonData?.course);
   const { mi: initMi, li: initLi } = lessonData || {};
   const [mi,       setMi      ] = useState(initMi||0);
@@ -2540,6 +2897,7 @@ const LessonPage = ({ lessonData, setPage, setLesson }) => {
   const [confetti, setConfetti] = useState(false);
   const [watchInfo, setWatchInfo] = useState(sourceCourse ? DB.watch(sourceCourse.id, sourceCourse.modules[initMi||0]?.lessons[initLi||0]?.id) : defaultWatchState());
   const [trackingSupported, setTrackingSupported] = useState(Boolean(getYtId(sourceCourse?.modules[initMi||0]?.lessons[initLi||0]?.youtubeId)));
+  const [courseCompleted, setCourseCompleted] = useState(null);
   const completeTimer = useRef(null);
   const completionTriggered = useRef(false);
   const course = sourceCourse;
@@ -2568,6 +2926,10 @@ const LessonPage = ({ lessonData, setPage, setLesson }) => {
     completionTriggered.current = progress.includes(curLs.id);
   }, [course, curLs]);
 
+  useEffect(() => {
+    setCourseCompleted(null);
+  }, [course?.id]);
+
   useEffect(() => () => clearTimeout(completeTimer.current), []);
 
   const goTo = (newMi, newLi) => { setMi(newMi); setLi(newLi); setConfetti(false); };
@@ -2588,14 +2950,17 @@ const LessonPage = ({ lessonData, setPage, setLesson }) => {
     const updated = DB.progress(course.id);
     setDoneIds(updated);
     setWatchInfo(DB.watch(course.id, curLs.id));
+    const hasFinishedCourse = updated.length === tot;
 
-    if (updated.length === tot) DB.finishCourse(course.id);
+    if (hasFinishedCourse) {
+      setCourseCompleted(DB.finishCourse(course.id));
+    }
 
     setConfetti(true);
     clearTimeout(completeTimer.current);
     completeTimer.current = setTimeout(() => {
       setConfetti(false);
-      if (flatIdx < tot - 1) {
+      if (!hasFinishedCourse && flatIdx < tot - 1) {
         const nextLesson = flatLessons(course)[flatIdx + 1];
         goTo(nextLesson.mi, nextLesson.li);
       }
@@ -2819,12 +3184,40 @@ const LessonPage = ({ lessonData, setPage, setLesson }) => {
           )}
         </div>
       </div>
+
+      {courseCompleted && (
+        <div className="overlay" style={{padding:"20px"}}>
+          <div style={{width:"min(960px,100%)",maxHeight:"90vh",overflowY:"auto",background:"white",borderRadius:24,padding:"24px 22px",boxShadow:"0 28px 80px rgba(0,0,0,.28)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start",marginBottom:16}}>
+              <div>
+                <div style={{fontFamily:"'Amiri',serif",fontSize:"1.8rem",color:C.emD,marginBottom:6}}>Alhamdulillah! Course Completed</div>
+                <div style={{fontSize:".9rem",color:C.textL,lineHeight:1.7}}>
+                  Your certificate for <strong style={{color:C.text}}>{course.title}</strong> is now ready. You can open it now or return to your dashboard.
+                </div>
+              </div>
+              <button onClick={()=>setCourseCompleted(null)} style={{background:"transparent",border:"none",fontSize:"1.4rem",cursor:"pointer",color:C.textL,lineHeight:1}}>×</button>
+            </div>
+
+            <div className="action-row" style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:18}}>
+              <Btn v="gold" onClick={() => { setCourse(course); setPage("certificate"); }}>View Certificate</Btn>
+              <Btn v="outline" onClick={() => { setCourseCompleted(null); setPage("dashboard"); }}>Go to Dashboard</Btn>
+            </div>
+
+            <div style={{fontSize:".78rem",color:C.textL,marginBottom:14}}>
+              Certificate ID: <strong style={{color:C.emD}}>{courseCompleted.certificateId}</strong>
+            </div>
+
+            <HadiyaSupportCard style={{maxWidth:"none",boxShadow:"none"}} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 // ─── STUDENT DASHBOARD ────────────────────────────────────────────────────────
 const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdated }) => {
+  const courseCatalog = getCourseCatalog();
   const [sec,         setSec        ] = useState("overview");
   const [courses,     setCourses    ] = useState([]);
   const [allProg,     setAllProg    ] = useState({});
@@ -2853,7 +3246,8 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
   useEffect(() => {
     if (!currentUser) return;
     const sync = () => {
-      setCourses(COURSES.filter(c => DB.enrolled().includes(c.id)).map(c => resolveCourse(c)));
+      const catalog = getCourseCatalog();
+      setCourses(catalog.filter(c => DB.enrolled().includes(c.id)).map(c => resolveCourse(c)));
       setAllProg(DB.allProgress());
       setNotes(DB.allNotes());
       setStreak(DB.streak());
@@ -3097,7 +3491,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
               </div>
             ) : (
               <div style={{display:"grid",gap:11}}>
-                {COURSES.flatMap(course=>course.modules.flatMap(mod=>mod.lessons.filter(ls=>notes[ls.id]?.trim()).map(ls=>(
+                {courseCatalog.flatMap(course=>course.modules.flatMap(mod=>mod.lessons.filter(ls=>notes[ls.id]?.trim()).map(ls=>(
                   <div key={ls.id} style={{background:"white",borderRadius:12,padding:18,border:`1px solid ${C.border}`}}>
                     <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:11}}>
                       <span style={{fontSize:"1.05rem"}}>{course.thumb}</span>
@@ -3128,42 +3522,49 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                 <div style={{fontWeight:600,marginBottom:5}}>No certificates yet</div>
                 <div style={{fontSize:".8rem",color:C.textL}}>Complete every lesson in a course to unlock a printable certificate.</div>
               </div>
-            ) : completedCourses.map(c=>{
-              const completion = completions[String(c.id)] || {
-                completedAt: dayKey(),
-                certificateId: `NUR-${String(c.id).padStart(3, "0")}-${dayKey().replaceAll("-", "")}-${currentUser.id.slice(-4).toUpperCase()}`,
-              };
-              return (
-                <div key={c.id} style={{background:"white",borderRadius:14,border:`2px solid ${C.gold}32`,overflow:"hidden",marginBottom:18,boxShadow:C.shG}}>
-                  <div style={{background:`linear-gradient(135deg,${C.emD},${C.em})`,padding:"22px 34px",position:"relative",overflow:"hidden"}}>
-                    <Iso op={0.1} col={C.gold}/>
-                    <div style={{position:"relative",zIndex:1,textAlign:"center"}}>
-                    <div style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:"1rem",marginBottom:2}}>نور أكاديمي · Nur Academy</div>
-                    <div style={{fontFamily:"'Amiri',serif",color:"white",fontSize:"1.55rem",fontWeight:700}}>Certificate of Completion</div>
-                  </div>
-                </div>
-                  <div style={{padding:"20px 34px",textAlign:"center",background:C.cream}}>
-                  <div style={{borderTop:`2px solid ${C.gold}28`,borderBottom:`2px solid ${C.gold}28`,padding:"14px 0",margin:"0 0 14px"}}>
-                      <div style={{color:C.textL,fontSize:".78rem",marginBottom:5}}>This certifies that</div>
-                    <div style={{fontFamily:"'Amiri',serif",fontSize:"1.35rem",color:C.emD,fontWeight:700}}>{currentUser.name}</div>
-                    <div style={{color:C.textL,fontSize:".78rem",margin:"5px 0"}}>has successfully completed</div>
-                    <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.08rem",color:C.gold,fontWeight:700}}>{c.title}</div>
-                    {c.selectedTrackLabel&&<div style={{fontSize:".74rem",color:C.textL,marginTop:4}}>{c.selectedTrackLabel} Track</div>}
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:".7rem",color:C.textL}}>
-                      <span>📅 {formatDay(completion.completedAt)}</span>
-                      <span>🔐 {completion.certificateId}</span>
+            ) : (
+              <>
+                {completedCourses.map(c=>{
+                  const completion = completions[String(c.id)] || {
+                    completedAt: dayKey(),
+                    certificateId: `NUR-${String(c.id).padStart(3, "0")}-${dayKey().replaceAll("-", "")}-${currentUser.id.slice(-4).toUpperCase()}`,
+                  };
+                  return (
+                    <div key={c.id} style={{background:"white",borderRadius:14,border:`2px solid ${C.gold}32`,overflow:"hidden",marginBottom:18,boxShadow:C.shG}}>
+                      <div style={{background:`linear-gradient(135deg,${C.emD},${C.em})`,padding:"22px 34px",position:"relative",overflow:"hidden"}}>
+                        <Iso op={0.1} col={C.gold}/>
+                        <div style={{position:"relative",zIndex:1,textAlign:"center"}}>
+                        <div style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:"1rem",marginBottom:2}}>نور أكاديمي · Nur Academy</div>
+                        <div style={{fontFamily:"'Amiri',serif",color:"white",fontSize:"1.55rem",fontWeight:700}}>Certificate of Completion</div>
+                      </div>
+                    </div>
+                      <div style={{padding:"20px 34px",textAlign:"center",background:C.cream}}>
+                      <div style={{borderTop:`2px solid ${C.gold}28`,borderBottom:`2px solid ${C.gold}28`,padding:"14px 0",margin:"0 0 14px"}}>
+                          <div style={{color:C.textL,fontSize:".78rem",marginBottom:5}}>This certifies that</div>
+                        <div style={{fontFamily:"'Amiri',serif",fontSize:"1.35rem",color:C.emD,fontWeight:700}}>{currentUser.name}</div>
+                        <div style={{color:C.textL,fontSize:".78rem",margin:"5px 0"}}>has successfully completed</div>
+                        <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.08rem",color:C.gold,fontWeight:700}}>{c.title}</div>
+                        {c.selectedTrackLabel&&<div style={{fontSize:".74rem",color:C.textL,marginTop:4}}>{c.selectedTrackLabel} Track</div>}
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:".7rem",color:C.textL}}>
+                          <span>📅 {formatDay(completion.completedAt)}</span>
+                          <span>🔐 {completion.certificateId}</span>
+                        </div>
+                      </div>
+                      <div className="dashboard-cert-footer" style={{padding:"11px 34px",background:"white",display:"flex",gap:8,justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`}}>
+                        <div style={{fontSize:".72rem",color:copyMsg?C.green:C.textL}}>{copyMsg || "Print now on GitHub Pages. Later, Railway can issue server-verified certificates."}</div>
+                        <div className="action-row" style={{display:"flex",gap:8}}>
+                          <Btn size="sm" v="outline" onClick={()=>handleCopyId(completion.certificateId)}>🔑 Copy ID</Btn>
+                          <Btn size="sm" v="gold" onClick={()=>printCertificate(c, currentUser, completion)}>🖨 Print / Save PDF</Btn>
+                        </div>
                     </div>
                   </div>
-                  <div className="dashboard-cert-footer" style={{padding:"11px 34px",background:"white",display:"flex",gap:8,justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`}}>
-                    <div style={{fontSize:".72rem",color:copyMsg?C.green:C.textL}}>{copyMsg || "Print now on GitHub Pages. Later, Railway can issue server-verified certificates."}</div>
-                    <div className="action-row" style={{display:"flex",gap:8}}>
-                      <Btn size="sm" v="outline" onClick={()=>handleCopyId(completion.certificateId)}>🔑 Copy ID</Btn>
-                      <Btn size="sm" v="gold" onClick={()=>printCertificate(c, currentUser, completion)}>🖨 Print / Save PDF</Btn>
-                    </div>
+                )})}
+                <div style={{marginTop:8}}>
+                  <HadiyaSupportCard style={{maxWidth:"none",boxShadow:"none"}} />
                 </div>
-              </div>
-            )})}
+              </>
+            )}
           </div>
         )}
 
@@ -3556,8 +3957,157 @@ const ContactPage = () => {
 
 // ─── ADMIN ────────────────────────────────────────────────────────────────────
 const AdminPage = ({ setPage, currentUser }) => {
-  const [sec,     setSec    ] = useState("overview");
-  const [showAdd, setShowAdd] = useState(false);
+  const [sec, setSec] = useState("overview");
+  const [users, setUsers] = useState(() => AdminDB.users());
+  const [customCourses, setCustomCourses] = useState(() => AdminDB.customCourses());
+  const [certificates, setCertificates] = useState(() => AdminDB.certificates());
+  const [notice, setNotice] = useState({ type:"", text:"" });
+  const [userForm, setUserForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "student",
+  });
+  const [courseForm, setCourseForm] = useState({
+    title: "",
+    titleAr: "",
+    instructor: "",
+    category: "Fiqh",
+    level: "Beginner",
+    thumb: "📘",
+    color: C.em,
+    playlist: "",
+    firstVideoId: "",
+    firstLessonTitle: "Lesson 01 - Introduction",
+    firstLessonDuration: "15:00",
+    desc: "",
+  });
+  const noticeTimer = useRef(null);
+  const courseCatalog = getCourseCatalog();
+  const blockedCount = users.filter(user => user.blockedAt).length;
+  const studentCount = users.filter(user => user.role !== "admin").length;
+  const adminCount = users.filter(user => user.role === "admin").length;
+  const recentUsers = [...users].sort((a, b) => String(b.joinedAt || "").localeCompare(String(a.joinedAt || ""))).slice(0, 5);
+  const recentCertificates = certificates.slice(0, 6);
+
+  const sync = useCallback(() => {
+    setUsers(AdminDB.users());
+    setCustomCourses(AdminDB.customCourses());
+    setCertificates(AdminDB.certificates());
+  }, []);
+
+  const flash = useCallback((text, type="success") => {
+    setNotice({ text, type });
+    window.clearTimeout(noticeTimer.current);
+    noticeTimer.current = window.setTimeout(() => setNotice({ text:"", type:"" }), 2600);
+  }, []);
+
+  useEffect(() => {
+    sync();
+    window.addEventListener("nur:data", sync);
+    return () => {
+      window.removeEventListener("nur:data", sync);
+      window.clearTimeout(noticeTimer.current);
+    };
+  }, [sync]);
+
+  const handleCreateUser = async (event) => {
+    event.preventDefault();
+    try {
+      await Auth.createUser(userForm);
+      setUserForm({ name:"", email:"", password:"", role:"student" });
+      sync();
+      flash("User added on this browser.");
+      setSec("users");
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
+
+  const handleToggleRole = (user) => {
+    try {
+      const nextRole = user.role === "admin" ? "student" : "admin";
+      Auth.setRole(user.id, nextRole);
+      sync();
+      flash(`${user.name} is now a ${nextRole}.`);
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
+
+  const handleToggleBlocked = (user) => {
+    const nextBlocked = !user.blockedAt;
+    const reason = nextBlocked
+      ? (window.prompt(`Reason for blocking ${user.name}?`, user.blockedReason || "Blocked by admin.") || "").trim()
+      : "";
+
+    try {
+      Auth.setBlocked(user.id, nextBlocked, reason);
+      sync();
+      flash(nextBlocked ? `${user.name} has been blocked.` : `${user.name} has been unblocked.`);
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
+
+  const handleDeleteUser = (user) => {
+    if (!window.confirm(`Delete ${user.name} (${user.email}) from this browser?`)) return;
+    try {
+      Auth.deleteUser(user.id);
+      sync();
+      flash("User deleted from this browser.");
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
+
+  const handleResetPassword = async (user) => {
+    const nextPassword = window.prompt(`Enter a new password for ${user.email}`, "");
+    if (!nextPassword) return;
+    try {
+      await Auth.resetUserPassword(user.id, nextPassword);
+      flash(`Password updated for ${user.email}.`);
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
+
+  const handleCreateCourse = (event) => {
+    event.preventDefault();
+    try {
+      AdminDB.createCourse(courseForm);
+      setCourseForm({
+        title: "",
+        titleAr: "",
+        instructor: "",
+        category: "Fiqh",
+        level: "Beginner",
+        thumb: "📘",
+        color: C.em,
+        playlist: "",
+        firstVideoId: "",
+        firstLessonTitle: "Lesson 01 - Introduction",
+        firstLessonDuration: "15:00",
+        desc: "",
+      });
+      sync();
+      flash("Custom course added.");
+      setSec("courses");
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
+
+  const handleDeleteCourse = (course) => {
+    if (!window.confirm(`Delete the custom course "${course.title}" from this browser?`)) return;
+    try {
+      AdminDB.deleteCourse(course.id);
+      sync();
+      flash("Custom course deleted.");
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
 
   if (!currentUser || currentUser.role !== "admin") {
     return (
@@ -3579,7 +4129,7 @@ const AdminPage = ({ setPage, currentUser }) => {
           <div style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".83rem"}}>نور أكاديمي</div>
           <div style={{color:"white",fontWeight:700,fontSize:".78rem"}}>Admin Panel</div>
         </div>
-        {[["📊","Overview","overview"],["📚","Courses","courses"],["👥","Students","students"],["📝","Quizzes","quizzes"]].map(([ic,l,k])=>(
+        {[["📊","Overview","overview"],["👥","Users","users"],["📚","Courses","courses"],["🏆","Certificates","certs"]].map(([ic,l,k])=>(
           <div key={k} onClick={()=>setSec(k)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 11px",borderRadius:7,cursor:"pointer",marginBottom:2,transition:"all .2s",background:sec===k?"rgba(201,168,76,.18)":"transparent",color:sec===k?C.gold:"rgba(255,255,255,.52)",fontSize:".8rem",fontWeight:sec===k?600:400}}>
             <span>{ic}</span>{l}
           </div>
@@ -3589,17 +4139,25 @@ const AdminPage = ({ setPage, currentUser }) => {
         </div>
       </div>
       <div className="admin-content" style={{flex:1,marginLeft:200,padding:"22px 26px"}}>
+        {notice.text && (
+          <div style={{marginBottom:16,padding:"11px 14px",borderRadius:12,background:notice.type==="error" ? "#FEE2E2" : "#ECFDF5",border:`1px solid ${notice.type==="error" ? "#FCA5A5" : "#A7F3D0"}`,color:notice.type==="error" ? "#991B1B" : "#065F46",fontSize:".8rem",fontWeight:700}}>
+            {notice.text}
+          </div>
+        )}
         {sec==="overview"&&(
           <div className="page">
             <div className="admin-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
               <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E"}}>Admin Overview</h1>
-              <Btn v="gold" icon="+" onClick={()=>setShowAdd(true)}>Add Course</Btn>
+              <div style={{display:"flex",gap:8}}>
+                <Btn v="outline" onClick={()=>setSec("users")}>Manage Users</Btn>
+                <Btn v="gold" onClick={()=>setSec("courses")}>Add Course</Btn>
+              </div>
             </div>
             <div style={{background:"white",borderRadius:12,padding:"13px 16px",boxShadow:"0 2px 8px rgba(0,0,0,.06)",marginBottom:16,fontSize:".78rem",color:"#6B7280",lineHeight:1.6}}>
-              This admin panel is read-only while you are on GitHub Pages. When you move to Railway, connect these screens to your API for real course, student, and certificate management.
+              These admin tools now work locally in this browser. Users, blocked status, custom courses, and certificate records are persisted in local storage until you connect a hosted backend.
             </div>
             <div className="grid-4" style={{gridTemplateColumns:"repeat(4,1fr)",gap:13,marginBottom:20}}>
-              {[{icon:"👥",l:"Students",v:"12,847",col:C.em},{icon:"📚",l:"Courses",v:"9",col:C.gold},{icon:"📦",l:"Total Modules",v:String(COURSES.reduce((a,c)=>a+c.modules.length,0)),col:"#7C3AED"},{icon:"💰",l:"Revenue",v:"$18,940",col:C.green}].map((s,i)=>(
+              {[{icon:"👥",l:"Students",v:String(studentCount),col:C.em},{icon:"🛡️",l:"Admins",v:String(adminCount),col:C.gold},{icon:"📚",l:"Courses",v:String(courseCatalog.length),col:"#7C3AED"},{icon:"🏆",l:"Certificates",v:String(certificates.length),col:C.green}].map((s,i)=>(
                 <div key={i} style={{background:"white",borderRadius:12,padding:16,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
                   <div style={{fontSize:"1.25rem",marginBottom:5}}>{s.icon}</div>
                   <div style={{fontSize:"1.35rem",fontWeight:800,color:s.col}}>{s.v}</div>
@@ -3607,24 +4165,183 @@ const AdminPage = ({ setPage, currentUser }) => {
                 </div>
               ))}
             </div>
+            <div className="grid-2" style={{gridTemplateColumns:"1.2fr .8fr",gap:16}}>
+              <div className="table-wrap" style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <div style={{padding:"13px 17px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:".86rem",color:"#1A1A2E"}}>Recent Users</div>
+                <table>
+                  <thead><tr>{["Name","Role","Joined","Status"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {recentUsers.map(user=>(
+                      <tr key={user.id}>
+                        <td>
+                          <div style={{fontWeight:700,fontSize:".8rem"}}>{user.name}</div>
+                          <div style={{fontSize:".66rem",color:"#9CA3AF"}}>{user.email}</div>
+                        </td>
+                        <td><Badge col={user.role==="admin" ? C.gold : C.em}>{user.role}</Badge></td>
+                        <td style={{fontWeight:700}}>{formatDay(user.joinedAt)}</td>
+                        <td><Badge col={user.blockedAt ? C.red : C.green}>{user.blockedAt ? "Blocked" : "Active"}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:10}}>Quick Status</div>
+                <div style={{display:"grid",gap:10,fontSize:".78rem",color:"#4B5563"}}>
+                  <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{customCourses.length} custom courses added on this browser.</div>
+                  <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{blockedCount} blocked user accounts right now.</div>
+                  <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{recentCertificates.length} latest certificates are ready for review in the Certificates tab.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {sec==="users"&&(
+          <div className="page">
+            <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E",marginBottom:18}}>User Management</h1>
+            <div className="grid-2" style={{gridTemplateColumns:"minmax(320px,420px) 1fr",gap:16}}>
+              <form onSubmit={handleCreateUser} style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:12}}>Add User</div>
+                {[["Name","name","text","Dar Ishfaq"],["Email","email","email","name@example.com"],["Password","password","password","At least 8 characters"]].map(([label,key,type,placeholder])=>(
+                  <div key={key} style={{marginBottom:12}}>
+                    <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
+                    <input type={type} value={userForm[key]} onChange={e=>setUserForm(form => ({ ...form, [key]: e.target.value }))} placeholder={placeholder} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".84rem"}} />
+                  </div>
+                ))}
+                <div style={{marginBottom:14}}>
+                  <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Role</label>
+                  <select value={userForm.role} onChange={e=>setUserForm(form => ({ ...form, role: e.target.value }))} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".84rem",background:"white"}}>
+                    <option value="student">Student</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <Btn type="submit" v="primary" style={{width:"100%",justifyContent:"center"}}>Create User</Btn>
+              </form>
+              <div className="table-wrap" style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <div style={{padding:"13px 17px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:".86rem",color:"#1A1A2E"}}>All Users</div>
+                <table>
+                  <thead><tr>{["User","Role","Joined","Status","Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {users.map(user=>{
+                      const protectedAccount = user.id === "nur_admin_primary" || user.id === currentUser.id;
+                      return (
+                        <tr key={user.id}>
+                          <td>
+                            <div style={{fontWeight:700,fontSize:".8rem"}}>{user.name}</div>
+                            <div style={{fontSize:".66rem",color:"#9CA3AF"}}>{user.email}</div>
+                          </td>
+                          <td><Badge col={user.role==="admin" ? C.gold : C.em}>{user.role}</Badge></td>
+                          <td style={{fontWeight:700}}>{formatDay(user.joinedAt)}</td>
+                          <td>
+                            <Badge col={user.blockedAt ? C.red : C.green}>{user.blockedAt ? "Blocked" : "Active"}</Badge>
+                            {user.blockedAt && <div style={{fontSize:".63rem",color:"#9CA3AF",marginTop:4}}>{user.blockedReason || "Blocked by admin."}</div>}
+                          </td>
+                          <td>
+                            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                              <Btn size="sm" v="ghost" onClick={()=>handleResetPassword(user)}>Reset Password</Btn>
+                              {!protectedAccount && <Btn size="sm" v="outline" onClick={()=>handleToggleRole(user)}>{user.role==="admin" ? "Make Student" : "Make Admin"}</Btn>}
+                              {!protectedAccount && <Btn size="sm" v={user.blockedAt ? "success" : "danger"} onClick={()=>handleToggleBlocked(user)}>{user.blockedAt ? "Unblock" : "Block"}</Btn>}
+                              {!protectedAccount && <Btn size="sm" v="danger" onClick={()=>handleDeleteUser(user)}>Delete</Btn>}
+                              {protectedAccount && <span style={{fontSize:".68rem",color:"#9CA3AF",alignSelf:"center"}}>Protected</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+        {sec==="courses"&&(
+          <div className="page">
+            <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E",marginBottom:18}}>Course Management</h1>
+            <div className="grid-2" style={{gridTemplateColumns:"minmax(340px,430px) 1fr",gap:16}}>
+              <form onSubmit={handleCreateCourse} style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:12}}>Add Custom Course</div>
+                {[["Course Title","title","e.g. Fiqh of Prayer"],["Arabic Title","titleAr","e.g. فقه الصلاة"],["Instructor","instructor","e.g. Sheikh Name"],["Thumbnail Emoji","thumb","e.g. 📘"],["Theme Color","color","#0B5240"],["Playlist ID","playlist","e.g. PLxxxxxxxx"],["Featured Video ID","firstVideoId","e.g. dQw4w9WgXcQ"],["First Lesson Title","firstLessonTitle","Lesson 01 - Introduction"],["First Lesson Duration","firstLessonDuration","15:00"]].map(([label,key,placeholder])=>(
+                  <div key={key} style={{marginBottom:12}}>
+                    <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
+                    <input value={courseForm[key]} onChange={e=>setCourseForm(form => ({ ...form, [key]: e.target.value }))} placeholder={placeholder} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".84rem"}} />
+                  </div>
+                ))}
+                <div className="grid-2" style={{gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                  <div>
+                    <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Category</label>
+                    <select value={courseForm.category} onChange={e=>setCourseForm(form => ({ ...form, category: e.target.value }))} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".84rem",background:"white"}}>
+                      {CATEGORY_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Level</label>
+                    <select value={courseForm.level} onChange={e=>setCourseForm(form => ({ ...form, level: e.target.value }))} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".84rem",background:"white"}}>
+                      {LEVEL_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Description</label>
+                  <textarea value={courseForm.desc} onChange={e=>setCourseForm(form => ({ ...form, desc: e.target.value }))} placeholder="Short course description" style={{width:"100%",minHeight:84,padding:"9px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".84rem",resize:"vertical"}} />
+                </div>
+                <Btn type="submit" v="primary" style={{width:"100%",justifyContent:"center"}}>Create Custom Course</Btn>
+              </form>
+              <div className="table-wrap" style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <div style={{padding:"13px 17px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:".86rem",color:"#1A1A2E"}}>Course Catalog</div>
+                <table>
+                  <thead><tr>{["Course","Category","Lessons","Source","Playlist","Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {courseCatalog.map(course=>(
+                      <tr key={course.id}>
+                        <td>
+                          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                            <div style={{width:30,height:30,borderRadius:6,background:`${course.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".9rem"}}>{course.thumb}</div>
+                            <div>
+                              <div style={{fontWeight:700,fontSize:".8rem"}}>{course.title}</div>
+                              <div style={{fontSize:".66rem",color:"#9CA3AF"}}>{course.instructor}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td><Badge col={C.em}>{course.category}</Badge></td>
+                        <td style={{fontWeight:700}}>{totalLessons(course)}</td>
+                        <td><Badge col={course.adminManaged ? C.gold : C.textL}>{course.adminManaged ? "Custom" : "Built In"}</Badge></td>
+                        <td style={{fontSize:".72rem",color:"#4B5563"}}>{course.playlist || "—"}</td>
+                        <td>
+                          {course.adminManaged ? (
+                            <Btn size="sm" v="danger" onClick={()=>handleDeleteCourse(course)}>Delete</Btn>
+                          ) : (
+                            <span style={{fontSize:".68rem",color:"#9CA3AF"}}>Protected</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+        {sec==="certs"&&(
+          <div className="page">
+            <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E",marginBottom:18}}>Certificate Records</h1>
             <div className="table-wrap" style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
-              <div style={{padding:"13px 17px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:".86rem",color:"#1A1A2E"}}>All Courses</div>
+              <div style={{padding:"13px 17px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:".86rem",color:"#1A1A2E"}}>Issued Certificates</div>
               <table>
-                <thead><tr>{["Course","Category","Modules","Lessons","Students","Price"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{["Student","Course","Completed","Certificate ID"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {COURSES.map(c=>(
-                    <tr key={c.id}>
+                  {certificates.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} style={{padding:"24px 14px",textAlign:"center",color:"#6B7280"}}>No certificates have been issued on this browser yet.</td>
+                    </tr>
+                  ) : certificates.map((record, idx)=>(
+                    <tr key={`${record.user.id}-${record.course.id}-${idx}`}>
                       <td>
-                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                          <div style={{width:30,height:30,borderRadius:6,background:`${c.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".9rem"}}>{c.thumb}</div>
-                          <div><div style={{fontWeight:600,fontSize:".8rem"}}>{c.title}</div><div style={{fontSize:".66rem",color:"#9CA3AF"}}>{c.instructor}</div></div>
-                        </div>
+                        <div style={{fontWeight:700,fontSize:".8rem"}}>{record.user.name}</div>
+                        <div style={{fontSize:".66rem",color:"#9CA3AF"}}>{record.user.email || record.user.id}</div>
                       </td>
-                      <td><Badge col={C.em}>{c.category}</Badge></td>
-                      <td style={{fontWeight:700}}>{c.modules.length}</td>
-                      <td style={{fontWeight:700}}>{totalLessons(c)}</td>
-                      <td style={{fontWeight:700}}>{c.students.toLocaleString()}</td>
-                      <td><Badge col={c.isFree?C.em:C.gold}>{c.isFree?"Free":`$${c.price}`}</Badge></td>
+                      <td style={{fontWeight:700}}>{record.course.title}</td>
+                      <td>{formatDay(record.completion.completedAt)}</td>
+                      <td style={{fontFamily:"monospace",fontSize:".74rem"}}>{record.completion.certificateId}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -3632,39 +4349,7 @@ const AdminPage = ({ setPage, currentUser }) => {
             </div>
           </div>
         )}
-        {sec!=="overview"&&(
-          <div className="page">
-            <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E",marginBottom:18,textTransform:"capitalize"}}>{sec}</h1>
-            <div style={{background:"white",borderRadius:12,padding:28,textAlign:"center",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
-              <div style={{fontSize:"1.8rem",marginBottom:11}}>🛠️</div>
-              <div style={{color:"#6B7280",fontSize:".85rem",marginBottom:14}}>Connect to your FastAPI backend to manage {sec} via the REST API.</div>
-              <div style={{padding:"12px 16px",background:"#F9FAFB",borderRadius:8,fontSize:".75rem",color:"#374151",textAlign:"left",fontFamily:"monospace",display:"inline-block"}}>
-                GET /api/admin/{sec}<br/>POST /api/admin/{sec}<br/>PUT /api/admin/{sec}/&#123;id&#125;<br/>DELETE /api/admin/{sec}/&#123;id&#125;
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-      {showAdd&&(
-        <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setShowAdd(false);}}>
-          <div style={{background:"white",borderRadius:17,padding:30,maxWidth:490,width:"90%"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-              <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.25rem",color:C.emD}}>Add New Course</h2>
-              <button onClick={()=>setShowAdd(false)} style={{background:"none",border:"none",fontSize:"1.3rem",cursor:"pointer"}}>×</button>
-            </div>
-            {[["Course Title","text","e.g. Fiqh of Prayer"],["Arabic Title","text","e.g. فقه الصلاة"],["YouTube Playlist ID","text","e.g. PLxxxxxxxxxxx"],["Instructor","text","Sheikh Name"]].map(([l,t,ph])=>(
-              <div key={l} style={{marginBottom:12}}>
-                <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{l}</label>
-                <input type={t} placeholder={ph} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".85rem"}}/>
-              </div>
-            ))}
-            <div className="action-row" style={{display:"flex",gap:9,marginTop:4}}>
-              <Btn v="outline" onClick={()=>setShowAdd(false)}>Cancel</Btn>
-              <Btn v="primary" onClick={()=>setShowAdd(false)}>✓ Create Course</Btn>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -3736,7 +4421,7 @@ export default function App() {
         {page==="home"          && <HomePage        setPage={setPage} setCourse={setCourse}/>}
         {page==="courses"       && <CoursesPage      setPage={setPage} setCourse={setCourse}/>}
         {page==="course-detail" && <CourseDetailPage course={course}   setPage={setPage} setLesson={setLesson} loggedIn={loggedIn}/>}
-        {page==="lesson"        && <LessonPage       lessonData={lessonData} setPage={setPage} setLesson={setLesson}/>}
+        {page==="lesson"        && <LessonPage       lessonData={lessonData} setPage={setPage} setLesson={setLesson} setCourse={setCourse}/>}
         {page==="dashboard"     && <DashboardPage    currentUser={currentUser} onSignOut={handleSignOut} onUserUpdated={handleUserUpdated} setPage={setPage} setLesson={(d)=>{ setLesson(d); setPage("lesson"); }}/>}
         {page==="admin"         && <AdminPage        currentUser={currentUser} setPage={setPage}/>}
         {page==="login"         && <LoginPage        setPage={setPage} onLogin={handleLogin}/>}
@@ -3750,7 +4435,7 @@ export default function App() {
             completion={certificateCompletion}
             onPrint={() => {
               if (activeCourse && currentUser && certificateCompletion) {
-                printCertificate(activeCourse, currentUser, certificateCompletion);
+                openCertificatePrintWindow(activeCourse, currentUser, certificateCompletion);
               }
             }}
           />
