@@ -3,6 +3,7 @@ import { Component, useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import signatureImage from "./assets/signature-optimized.png";
 import HadiyaSupportCard from "./components/HadiyaSupportCard";
+import { INSURANCE_PLAYLIST_ID, INSURANCE_PLAYLIST_ITEMS } from "./data/insurancePlaylist";
 import { LISANUL_QURAN_PLAYLIST_ID, LISANUL_QURAN_PLAYLIST_ITEMS } from "./data/lisanulQuranPlaylist";
 import { ISLAMIC_BASICS_PLAYLIST_ID, ISLAMIC_BASICS_PLAYLIST_ITEMS } from "./data/islamicBasicsPlaylist";
 import { MADANI_QAIDA_PLAYLIST_ID, MADANI_QAIDA_PLAYLIST_ITEMS } from "./data/madaniQaidaPlaylist";
@@ -176,11 +177,13 @@ const K = {
   SESSION: "nur_session_v2",
   DATA: "nur_data_v2",
   COURSES: "nur_courses_v1",
+  YT_DURATIONS: "nur_youtube_durations_v1",
 };
 const clearNurBrowserData = () => {
   ls.remove(K.USERS);
   ls.remove(K.SESSION);
   ls.remove(K.DATA);
+  ls.remove(K.YT_DURATIONS);
 };
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -903,7 +906,6 @@ const MUALIM_MODULE_BLUEPRINT = [
   { title:"Module 3 - Unit 3 Practice", icon:"🧠", desc:"Parts 8 to 11 followed by the surprise test for Units 1 to 3.", range:[13, 17] },
   { title:"Module 4 - Unit 4 Progression", icon:"📝", desc:"Parts 12 to 18 continuing the direct Quran understanding challenge.", range:[18, 24] },
   { title:"Module 5 - Final Public Lessons", icon:"🏁", desc:"Parts 19 to 25 currently visible on the public playlist.", range:[25, 30] },
-  { title:"Module 6 - Hidden Playlist Lessons", icon:"🔒", desc:"Three additional lesson slots counted by YouTube but not publicly visible in the playlist feed.", range:[31, 33] },
 ];
 const buildMualimModules = (items) =>
   MUALIM_MODULE_BLUEPRINT.map((section, idx) => {
@@ -1074,6 +1076,40 @@ const buildIslamicBasicsModules = (items) =>
       lessons
     );
   }).filter(section => section.lessons.length > 0);
+const insuranceLessonTitle = ({ index, sourceTitle }) => {
+  const cleaned = String(sourceTitle || "")
+    .replace(/\s+/g, " ")
+    .replace(/^ruling on\s*/i, "")
+    .replace(/^insurance company\s*/i, "Insurance company ")
+    .replace(/[?]+$/g, "")
+    .trim();
+
+  return `Lesson ${pad(index)} - ${cleaned || "Insurance Ruling"}`;
+};
+const buildInsuranceModules = (items) => {
+  const lessons = [...items]
+    .sort((a, b) => a.index - b.index)
+    .map(item => mkLesson(
+      `l15${pad(item.index)}`,
+      insuranceLessonTitle(item),
+      item.youtubeId,
+      item.duration,
+      {
+        free: true,
+        desc: "Imported from Sheikh Aziz bin Farhan Al Anizi's Insurance YouTube playlist.",
+      }
+    ));
+
+  return [
+    mkModule(
+      "m15a",
+      "Module 1 - Insurance Cases",
+      "🛡️",
+      "Short fiqh rulings covering common insurance and warranty questions.",
+      lessons
+    ),
+  ];
+};
 const shortSeerahLessonTitle = ({ index, sourceTitle }) => {
   const raw = String(sourceTitle || "").replace(/\s+/g, " ").trim();
   if (/don't miss out/i.test(raw)) return `Lesson ${pad(index)} - Series Introduction`;
@@ -1183,36 +1219,29 @@ const buildPropheticParentingModules = (items) => [
 ];
 
 const COURSES = [
-  {
-    id:1, slug:"learn-quran",
-    title:"Learn Quran", titleAr:"تعلم القرآن الكريم",
-    instructor:"Sheikh Abdul Rahman", category:"Quran", level:"Beginner",
-    rating:4.9, students:3240, price:0, isFree:true,
-    badge:"Most Popular", badgeC:C.em,
-    thumb:"🕌", color:C.em,
-    desc:"Begin your Quran journey. Learn proper pronunciation, basic Tajweed, and read Arabic script from scratch.",
-    // ↓ Replace with your actual YouTube Playlist ID
-    playlist:"PLnxcNqv_D41uTY3YHHFPgoXsDrCQBz9Ge",
-    modules:[
-      mkModule("m1a","Module 1 — Arabic Alphabet","ا","Master the 28 Arabic letters",[
-        mkLesson("l1a1","Welcome & Course Overview","GrwrpA2H97A","8:30",{free:true,desc:"Introduction to your Quran learning journey. What you will achieve by the end.",res:["Course Syllabus.pdf","Alphabet Chart.pdf"]}),
-        mkLesson("l1a2","Letters: Alif to Kha","DEMO","22:15",{free:true,desc:"The first 7 letters with correct mouth positioning.",res:["Letters Worksheet 1.pdf"]}),
-        mkLesson("l1a3","Letters: Dal to Sheen","DEMO","19:45",{desc:"Letters 8-14. Practice reading and writing.",res:["Letters Worksheet 2.pdf"]}),
-        mkLesson("l1a4","Letters: Sad to Ghayn","DEMO","21:10",{desc:"The emphatic letters unique to Arabic.",res:["Letters Worksheet 3.pdf"]}),
-        mkLesson("l1a5","Letters: Fa to Ya — Complete","DEMO","20:30",{desc:"Final letters + full alphabet review.",res:["Complete Alphabet.pdf"]}),
-      ]),
-      mkModule("m1b","Module 2 — Reading Basics","◌","Vowels, Tanween and joining letters",[
-        mkLesson("l1b1","Short Vowels — Fathah, Kasrah, Dammah","DEMO","25:10",{desc:"The three short vowels are the key to reading Arabic.",res:["Vowels Sheet.pdf"]}),
-        mkLesson("l1b2","Long Vowels — Alif, Waw, Ya","DEMO","21:30",{desc:"Elongation vowels appear throughout the Quran."}),
-        mkLesson("l1b3","Tanween & Sukoon","DEMO","18:00",{desc:"Double vowels and the rest sign.",res:["Tanween Notes.pdf"]}),
-        mkLesson("l1b4","Shaddah — The Doubling Sign","DEMO","15:30",{desc:"Shaddah doubles a letter — critical for Quran recitation."}),
-        mkLesson("l1b5","Joining Letters — Reading Words","DEMO","27:20",{desc:"Put it all together and start reading Arabic words!",res:["Word Practice.pdf"]}),
-      ]),
-      mkModule("m1c","Module 3 — Short Surahs","📖","Read & understand short Quranic chapters",[
-        mkLesson("l1c1","Surah Al-Fatiha","DEMO","30:00",{free:true,desc:"Recited in every raka'ah. Full Tajweed + tafsir.",res:["Al-Fatiha Tafsir.pdf"]}),
-        mkLesson("l1c2","Surah Al-Ikhlas","DEMO","18:30",{desc:"Worth a third of the Quran in reward."}),
-        mkLesson("l1c3","Surah Al-Falaq & An-Nas","DEMO","22:00",{desc:"The two Surahs of refuge — morning & evening."}),
-        mkLesson("l1c4","Course Review & Certificate Prep","DEMO","15:00",{desc:"Full review + prepare for your certificate.",res:["Final Assessment Guide.pdf"]}),
+
+{
+    id: 16, 
+    slug: "tajweed-ul-qiraat",
+    title: "Tajweed-ul-Qira'at Course", 
+    titleAr: "دورة تجويد القراءات",
+    instructor: "Hafiz Saeed Raza Baghdadi", 
+    category: "Quran", 
+    level: "Beginner",
+    rating: 5.0, 
+    students: 1540, 
+    price: 0, 
+    isFree: true,
+    badge: "2 Lessons", 
+    badgeC: C.gold,
+    thumb: "📖", 
+    color: "#2D6A4F",
+    desc: "A short Tajweed ul Qira'at starter course using the two public lessons currently available from the playlist.",
+    playlist: "PLnxcNqv_D41uTY3YHHFPgoXsDrCQBz9Ge",
+    modules: [
+      mkModule("m16a", "Module 1 — Public Playlist Lessons", "🌟", "The first two public lessons currently available in the playlist.", [
+        mkLesson("l16a1", "Episode 1: Intro & Makharij", "GrwrpA2H97A", "27:35", { free: true }),
+        mkLesson("l16a2", "Episode 2: Arabic Alphabet", "iQ5OCVbHVjk", "25:00", { free: true }),
       ]),
     ],
   },
@@ -1226,17 +1255,6 @@ const COURSES = [
     desc:"A complete Urdu Tajweed video series covering terminology, noon sakinah and tanween, meem sakin, idgham families, hamza rules, and advanced Quran-reading cases.",
     playlist:TAJWEED_COURSE_PLAYLIST_ID,
     modules:buildTajweedModules(TAJWEED_COURSE_PLAYLIST_ITEMS),
-  },
-  {
-    id:14, slug:"tajweed-180-days",
-    title:"Learn Tajweed in 180 Days", titleAr:"تعلم التجويد في ١٨٠ يوما",
-    instructor:"Tayyba Quran Academy", category:"Quran", level:"Beginner",
-    rating:4.9, students:1860, price:0, isFree:true,
-    badge:"For Sisters", badgeC:"#A24D6E",
-    thumb:"🧕", color:"#7A4157",
-    desc:"A long-form Tajweed journey especially suitable for ladies and girls, helping them build daily Quran-reading consistency through guided lessons from Tayyba Quran Academy.",
-    playlist:SISTERS_TAJWEED_PLAYLIST_ID,
-    modules:buildSistersTajweedModules(SISTERS_TAJWEED_PLAYLIST_ITEMS),
   },
   {
     id:3, slug:"arabic-language",
@@ -1254,52 +1272,20 @@ const COURSES = [
     title:"Mualim ul Quran", titleAr:"معلم القرآن",
     instructor:"Hamza Sabherwal & Dr. Ubaid", category:"Quran", level:"Beginner",
     rating:4.9, students:3870, price:0, isFree:true,
-    badge:"33 Lessons", badgeC:C.gold,
+    badge:"30 Lessons", badgeC:C.gold,
     thumb:"📙", color:"#2F6F4F",
     desc:"A structured Muallim ul Quran challenge focused on understanding Quran directly in six months through guided lessons, homework checkpoints, revision sessions, and test-based practice.",
     playlist:MUALIM_UL_QURAN_PLAYLIST_ID,
     modules:buildMualimModules(MUALIM_UL_QURAN_PLAYLIST_ITEMS),
   },
   {
-    id:4, slug:"seerah-prophet",
-    title:"Seerah of Prophet ﷺ", titleAr:"السيرة النبوية",
-    instructor:"Sheikh Omar Suleiman", category:"Seerah", level:"All Levels",
-    rating:5.0, students:4120, price:0, isFree:true,
-    badge:"Free", badgeC:C.em,
-    thumb:"🌙", color:C.emD,
-    desc:"A comprehensive, moving journey through the blessed life of Prophet Muhammad ﷺ — from birth to passing.",
-    playlist:"PLdGFY6ZOJ73NLsvp6XBqR11tUMpWjXias",
-    modules:[
-      mkModule("m4a","Module 1 — Before Revelation","🌅","Arabia before Islam and early life",[
-        mkLesson("l4a1","Pre-Islamic Arabia","DEMO","22:00",{free:true,desc:"Social, religious, and political landscape.",res:["Arabia Map.pdf"]}),
-        mkLesson("l4a2","Birth of the Prophet ﷺ","DEMO","25:00",{free:true,desc:"The Year of the Elephant and early childhood."}),
-        mkLesson("l4a3","Youth & Character (Al-Amin)","DEMO","20:00",{desc:"The trustworthy young man before prophethood."}),
-        mkLesson("l4a4","Marriage to Khadijah رضي الله عنها","DEMO","18:00",{desc:"Their blessed marriage and family life."}),
-      ]),
-      mkModule("m4b","Module 2 — Makkah Period","🕌","Revelation, persecution and migration",[
-        mkLesson("l4b1","The First Revelation — Cave Hira","DEMO","28:00",{desc:"The night that changed humanity forever."}),
-        mkLesson("l4b2","Early Believers & Opposition","DEMO","24:00",{desc:"First Muslims and the Quraysh's brutal reaction.",res:["Early Muslims.pdf"]}),
-        mkLesson("l4b3","Persecution & Migration to Abyssinia","DEMO","26:00",{desc:"When a Christian king protected the Muslims."}),
-        mkLesson("l4b4","Year of Sorrow & Isra wal Mi'raj","DEMO","30:00",{desc:"Death of Khadijah and Abu Talib, then the night journey."}),
-        mkLesson("l4b5","The Hijra to Madinah","DEMO","25:00",{desc:"The defining migration that marks the Islamic calendar.",res:["Hijra Route Map.pdf"]}),
-      ]),
-      mkModule("m4c","Module 3 — Madinah Period","⚔️","Building the state and major events",[
-        mkLesson("l4c1","Constitution of Madinah","DEMO","22:00",{desc:"An extraordinary social contract between all communities."}),
-        mkLesson("l4c2","Battle of Badr","DEMO","28:00",{desc:"313 vs 1000. Divine victory.",res:["Badr Timeline.pdf"]}),
-        mkLesson("l4c3","Battle of Uhud — The Lesson","DEMO","26:00",{desc:"A lesson in obedience — why the archers left."}),
-        mkLesson("l4c4","The Conquest of Makkah","DEMO","30:00",{desc:"The greatest act of mercy — forgiving all enemies."}),
-        mkLesson("l4c5","The Final Sermon & Passing","DEMO","25:00",{desc:"His last words to humanity.",res:["Final Sermon Text.pdf"]}),
-      ]),
-    ],
-  },
-  {
     id:11, slug:"short-seerah-course",
     title:"Short Seerah Course", titleAr:"السيرة المختصرة",
     instructor:"Dr. Yasir Qadhi", category:"Seerah", level:"Beginner",
     rating:4.9, students:2180, price:0, isFree:true,
-    badge:"41 Lessons", badgeC:C.gold,
+    badge:"English", badgeC:C.gold,
     thumb:"🕊️", color:"#315B4C",
-    desc:"A shorter Seerah journey through the life of Prophet Muhammad, organized from a compact playlist for learners who want a faster overview.",
+    desc:"A shorter English Seerah journey through the life of Prophet Muhammad, organized from a compact playlist for learners who want a faster overview.",
     playlist:SHORT_SEERAH_PLAYLIST_ID,
     modules:buildShortSeerahModules(SHORT_SEERAH_PLAYLIST_ITEMS),
   },
@@ -1422,6 +1408,17 @@ const COURSES = [
     playlist:ISLAMIC_BASICS_PLAYLIST_ID,
     modules:buildIslamicBasicsModules(ISLAMIC_BASICS_PLAYLIST_ITEMS),
   },
+  {
+    id:15, slug:"insurance-rulings",
+    title:"Insurance Rulings", titleAr:"أحكام التأمين",
+    instructor:"Sheikh Aziz bin Farhan Al Anizi", category:"Fiqh", level:"Intermediate",
+    rating:4.8, students:920, price:0, isFree:true,
+    badge:"4 Lessons", badgeC:C.gold,
+    thumb:"🛡️", color:"#4C6A5A",
+    desc:"A concise fiqh mini-course answering common questions about car insurance, extended warranties, garage claim differences, and fully comprehensive cover.",
+    playlist:INSURANCE_PLAYLIST_ID,
+    modules:buildInsuranceModules(INSURANCE_PLAYLIST_ITEMS),
+  },
 ];
 const applyTrackToModules = (modules=[], lessonOverrides={}, moduleOverrides={}) => modules.map(mod => {
   const modulePatch = moduleOverrides[mod.id] || {};
@@ -1513,6 +1510,40 @@ const writeCustomCourses = (updater) => {
 };
 const getCourseCatalog = () => [...COURSES, ...readCustomCourses()];
 const getNextCourseId = () => getCourseCatalog().reduce((max, course) => Math.max(max, safeNum(course.id, 0)), 0) + 1;
+const pruneStoredCourseData = () => {
+  const validCourseIds = new Set(getCourseCatalog().map(course => String(course.id)));
+  const allData = readAllUserData();
+  let changed = false;
+
+  Object.keys(allData).forEach(userId => {
+    const state = mergeUserState(allData[userId] || {});
+    const nextEnrollments = state.enrollments.filter(id => validCourseIds.has(String(id)));
+    const nextCourseTracks = Object.fromEntries(Object.entries(state.courseTracks).filter(([courseId]) => validCourseIds.has(String(courseId))));
+    const nextProgress = Object.fromEntries(Object.entries(state.progress).filter(([courseId]) => validCourseIds.has(String(courseId))));
+    const nextCompletions = Object.fromEntries(Object.entries(state.completions).filter(([courseId]) => validCourseIds.has(String(courseId))));
+    const nextWatch = Object.fromEntries(Object.entries(state.watch).filter(([key]) => validCourseIds.has(String(key).split(":")[0])));
+
+    if (
+      nextEnrollments.length !== state.enrollments.length ||
+      Object.keys(nextCourseTracks).length !== Object.keys(state.courseTracks).length ||
+      Object.keys(nextProgress).length !== Object.keys(state.progress).length ||
+      Object.keys(nextCompletions).length !== Object.keys(state.completions).length ||
+      Object.keys(nextWatch).length !== Object.keys(state.watch).length
+    ) {
+      changed = true;
+      allData[userId] = {
+        ...state,
+        enrollments: nextEnrollments,
+        courseTracks: nextCourseTracks,
+        progress: nextProgress,
+        completions: nextCompletions,
+        watch: nextWatch,
+      };
+    }
+  });
+
+  if (changed) ls.set(K.DATA, allData);
+};
 const selectCourseTrackKey = (course, preferredTrackKey) => {
   if (!course?.trackOptions) return null;
   const keys = Object.keys(course.trackOptions);
@@ -1684,6 +1715,201 @@ const getYtId = (v) => {
     const m = v.match(p); if (m) return m[1];
   }
   return /^[a-zA-Z0-9_-]{11}$/.test(v) ? v : null;
+};
+const YT_DURATION_EVENT = "nur:yt-duration";
+const MAX_DURATION_PROBES = 3;
+let ytDurationCache = null;
+const ytDurationRequests = new Map();
+const ytDurationQueue = [];
+let activeDurationProbes = 0;
+const formatVideoDuration = (seconds) => {
+  const total = Math.max(0, Math.round(safeNum(seconds, 0)));
+  if (!total) return "";
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  return hours > 0
+    ? `${hours}:${pad(minutes)}:${pad(secs)}`
+    : `${minutes}:${pad(secs)}`;
+};
+const readYouTubeDurationCache = () => {
+  if (ytDurationCache) return ytDurationCache;
+  ytDurationCache = typeof window === "undefined" ? {} : ls.get(K.YT_DURATIONS, {});
+  return ytDurationCache;
+};
+const persistYouTubeDurationCache = (cache) => {
+  ytDurationCache = cache;
+  try {
+    localStorage.setItem(K.YT_DURATIONS, JSON.stringify(cache));
+  } catch {}
+};
+const cacheYouTubeDuration = (videoId, durationValue) => {
+  const id = getYtId(videoId);
+  const label = typeof durationValue === "string"
+    ? durationValue
+    : formatVideoDuration(durationValue);
+  if (!id || !label) return "";
+
+  const currentCache = readYouTubeDurationCache();
+  if (currentCache[id] === label) return label;
+
+  const nextCache = { ...currentCache, [id]: label };
+  persistYouTubeDurationCache(nextCache);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(YT_DURATION_EVENT, { detail: { id, label } }));
+  }
+  return label;
+};
+const waitForYouTubeDuration = (player, timeoutMs=12000) => new Promise((resolve, reject) => {
+  const startedAt = Date.now();
+  const check = () => {
+    try {
+      const duration = Math.max(0, safeNum(player?.getDuration?.(), 0));
+      if (duration > 0) {
+        resolve(duration);
+        return;
+      }
+    } catch {}
+
+    if (Date.now() - startedAt >= timeoutMs) {
+      reject(new Error("Timed out loading the YouTube duration."));
+      return;
+    }
+
+    window.setTimeout(check, 250);
+  };
+
+  check();
+});
+const probeYouTubeDuration = async (id) => {
+  const YT = await loadYouTubeAPI();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let player = null;
+    const mount = document.createElement("div");
+    mount.style.position = "fixed";
+    mount.style.left = "-20000px";
+    mount.style.top = "0";
+    mount.style.width = "1px";
+    mount.style.height = "1px";
+    mount.style.opacity = "0";
+    mount.style.pointerEvents = "none";
+    document.body.appendChild(mount);
+
+    const cleanup = () => {
+      try {
+        player?.destroy?.();
+      } catch {}
+      mount.remove();
+    };
+    const finish = (handler, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      handler(value);
+    };
+
+    player = new YT.Player(mount, {
+      width: "1",
+      height: "1",
+      videoId: id,
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        rel: 0,
+        playsinline: 1,
+        modestbranding: 1,
+      },
+      events: {
+        onReady: async (event) => {
+          try {
+            const seconds = await waitForYouTubeDuration(event.target);
+            finish(resolve, cacheYouTubeDuration(id, seconds));
+          } catch (error) {
+            finish(reject, error);
+          }
+        },
+        onError: (event) => {
+          finish(reject, new Error(`YouTube duration probe failed (${safeNum(event?.data, 0)}).`));
+        },
+      },
+    });
+  });
+};
+const pumpYouTubeDurationQueue = () => {
+  while (activeDurationProbes < MAX_DURATION_PROBES && ytDurationQueue.length) {
+    const { id, resolve, reject } = ytDurationQueue.shift();
+    activeDurationProbes += 1;
+
+    probeYouTubeDuration(id)
+      .then(resolve)
+      .catch(reject)
+      .finally(() => {
+        activeDurationProbes -= 1;
+        ytDurationRequests.delete(id);
+        pumpYouTubeDurationQueue();
+      });
+  }
+};
+const requestYouTubeDuration = (videoId) => {
+  const id = getYtId(videoId);
+  if (!id) return Promise.resolve("");
+
+  const cached = readYouTubeDurationCache()[id];
+  if (cached) return Promise.resolve(cached);
+  if (ytDurationRequests.has(id)) return ytDurationRequests.get(id);
+
+  const request = new Promise((resolve, reject) => {
+    ytDurationQueue.push({ id, resolve, reject });
+    pumpYouTubeDurationQueue();
+  });
+
+  ytDurationRequests.set(id, request);
+  return request;
+};
+const useResolvedLessonDuration = (videoId, fallback="") => {
+  const id = getYtId(videoId);
+  const fallbackLabel = fallback || "Unavailable";
+  const [duration, setDuration] = useState(() => {
+    if (!id) return fallbackLabel;
+    return readYouTubeDurationCache()[id] || fallbackLabel;
+  });
+
+  useEffect(() => {
+    if (!id) {
+      setDuration(fallbackLabel);
+      return;
+    }
+
+    const cached = readYouTubeDurationCache()[id];
+    if (cached) setDuration(cached);
+    else setDuration(fallbackLabel);
+
+    let cancelled = false;
+    const handleDuration = (event) => {
+      if (event.detail?.id === id && event.detail?.label) {
+        setDuration(event.detail.label);
+      }
+    };
+
+    window.addEventListener(YT_DURATION_EVENT, handleDuration);
+    requestYouTubeDuration(id)
+      .then(label => {
+        if (!cancelled && label) setDuration(label);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(YT_DURATION_EVENT, handleDuration);
+    };
+  }, [fallbackLabel, id]);
+
+  return duration || fallbackLabel;
+};
+const LessonDurationText = ({ videoId, fallback, style={} }) => {
+  const duration = useResolvedLessonDuration(videoId, fallback);
+  return <span style={style}>⏱ {duration}</span>;
 };
 
 const loadYouTubeAPI = () => {
@@ -2024,6 +2250,7 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
 
       if (delta > 0 && delta <= 4) watchedRef.current += delta;
       if (ended && duration > 0) watchedRef.current = Math.max(watchedRef.current, duration);
+      if (duration > 0) cacheYouTubeDuration(id, duration);
 
       const watchedSeconds = duration > 0 ? Math.min(duration, watchedRef.current) : watchedRef.current;
       const percent = duration > 0 ? Math.min(100, Math.round((watchedSeconds / duration) * 100)) : 0;
@@ -2059,6 +2286,7 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
           onReady: (event) => {
             const resumeAt = safeNum(initialWatchSeconds, 0);
             const duration = Math.max(0, safeNum(event.target.getDuration?.(), 0));
+            if (duration > 0) cacheYouTubeDuration(id, duration);
             if (resumeAt > 5 && duration > resumeAt + 5) {
               event.target.seekTo(resumeAt, true);
               lastTimeRef.current = resumeAt;
@@ -2223,12 +2451,19 @@ const StreakWidget = ({ big=false }) => {
 const CourseCard = ({ course, onClick }) => {
   const displayCourse = resolveCourse(course);
   const [pct, setPct] = useState(0);
+  const [enrolled, setEnrolled] = useState(DB.isEnrolled(displayCourse.id));
   const viewerId = currentUserId();
-  const enrolled = DB.isEnrolled(displayCourse.id);
   useEffect(() => {
-    const tot = totalLessons(displayCourse);
-    const dn  = DB.progress(displayCourse.id).length;
-    setPct(tot>0 ? Math.round(dn/tot*100) : 0);
+    const sync = () => {
+      const tot = totalLessons(displayCourse);
+      const dn = DB.progress(displayCourse.id).length;
+      setPct(tot>0 ? Math.round(dn/tot*100) : 0);
+      setEnrolled(DB.isEnrolled(displayCourse.id));
+    };
+
+    sync();
+    window.addEventListener("nur:data", sync);
+    return () => window.removeEventListener("nur:data", sync);
   }, [displayCourse.id, displayCourse.selectedTrackKey, viewerId]);
 
   return (
@@ -2320,7 +2555,9 @@ const ModuleList = ({ course, doneIds, isEnrolled, onLesson, curId }) => {
                       </div>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:".82rem",fontWeight:current?700:500,color:done?C.textL:C.text,textDecoration:done?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ls.title}</div>
-                        <div style={{fontSize:".68rem",color:C.textL,marginTop:1}}>⏱ {ls.duration}</div>
+                        <div style={{fontSize:".68rem",color:C.textL,marginTop:1}}>
+                          <LessonDurationText videoId={ls.youtubeId} fallback={ls.duration} />
+                        </div>
                       </div>
                       {ls.free&&!done&&<Badge col={C.gold}>Free</Badge>}
                     </div>
@@ -2466,7 +2703,7 @@ const Footer = () => (
           </div>
         </div>
         {[
-          {t:"Courses",ls:["Learn Quran","Tajweed","Arabic Language","Seerah","Aqidah"]},
+          {t:"Courses",ls:["Tajweed ul Qira'at","Arabic Language","Short Seerah","Aqidah","Islamic Basics"]},
           {t:"Platform",ls:["About Us","Instructors","Blog","Contact","Certificates"]},
           {t:"Support", ls:["Help Center","Community","Privacy Policy","Terms"]},
         ].map(col=>(
@@ -2700,10 +2937,16 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
 
   useEffect(() => {
     if (!baseCourse) return;
-    setTrackKey(DB.selectedTrack(baseCourse.id) || baseCourse.selectedTrackKey || baseCourse.defaultTrack || null);
-    setEnrolled(DB.isEnrolled(baseCourse.id));
-    setDoneIds(DB.progress(baseCourse.id));
-  }, [baseCourse?.id]);
+    const sync = () => {
+      setTrackKey(DB.selectedTrack(baseCourse.id) || baseCourse.selectedTrackKey || baseCourse.defaultTrack || null);
+      setEnrolled(DB.isEnrolled(baseCourse.id));
+      setDoneIds(DB.progress(baseCourse.id));
+    };
+
+    sync();
+    window.addEventListener("nur:data", sync);
+    return () => window.removeEventListener("nur:data", sync);
+  }, [baseCourse?.defaultTrack, baseCourse?.id, baseCourse?.selectedTrackKey]);
 
   const courseData = courseView;
   const trackChoices = courseData?.trackOptions ? Object.entries(courseData.trackOptions) : [];
@@ -2810,7 +3053,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
               <div>
                 {popped&&<div style={{textAlign:"center",fontSize:"1.3rem",marginBottom:7,animation:"pop .4s ease"}}>🎉 Enrolled!</div>}
                 <Btn v="primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{setLesson({course:courseData,mi:0,li:0});setPage("lesson");}}>
-                  {dn>0?"▶ Continue":"▶ Start Course"}
+                  ▶ Resume Course
                 </Btn>
                 <div style={{marginTop:9}}><PBar value={pct} label={`${pct}% complete`}/></div>
               </div>
@@ -3142,7 +3385,10 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
                           </div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:".74rem",color:isCur?"white":"rgba(255,255,255,.52)",fontWeight:isCur?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ls.title}</div>
-                            <div style={{fontSize:".6rem",color:"rgba(255,255,255,.24)",marginTop:1}}>⏱ {ls.duration}{!isDn&&watchPct>0?` · ${watchPct}% watched`:""}</div>
+                            <div style={{fontSize:".6rem",color:"rgba(255,255,255,.24)",marginTop:1}}>
+                              <LessonDurationText videoId={ls.youtubeId} fallback={ls.duration} />
+                              {!isDn&&watchPct>0?` · ${watchPct}% watched`:""}
+                            </div>
                           </div>
                         </div>
                       );
@@ -3432,7 +3678,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                         </div>
                         <div style={{display:"flex",justifyContent:"flex-end",marginTop:9}}>
                           <Btn size="sm" v="primary" onClick={()=>openLesson(c)}>
-                            {dn===0?"▶ Start":pct===100?"🔁 Review":"▶ Continue"} →
+                            {pct===100?"🔁 Review":"▶ Resume"} →
                           </Btn>
                         </div>
                       </div>
@@ -4371,6 +4617,7 @@ export default function App() {
     const syncUser = () => { if (active) setCurrentUser(Auth.current()); };
     (async () => {
       await Auth.ensureSeeded();
+      pruneStoredCourseData();
       syncUser();
       if (active) setAuthReady(true);
     })();
