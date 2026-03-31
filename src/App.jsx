@@ -3,17 +3,28 @@ import { Component, useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import signatureImage from "./assets/signature-optimized.png";
 import HadiyaSupportCard from "./components/HadiyaSupportCard";
+import { AASAN_ARABIC_GRAMMAR_PLAYLIST_ID, AASAN_ARABIC_GRAMMAR_PLAYLIST_ITEMS } from "./data/aasanArabicGrammarPlaylist";
+import { AQIDAH_ENGLISH_PLAYLIST_ID, AQIDAH_ENGLISH_PLAYLIST_ITEMS } from "./data/aqidahEnglishPlaylist";
+import { AQIDAH_URDU_PLAYLIST_ID, AQIDAH_URDU_PLAYLIST_ITEMS } from "./data/aqidahUrduPlaylist";
+import { ARBI_KA_MUALLIM_PLAYLIST_ID, ARBI_KA_MUALLIM_PLAYLIST_ITEMS } from "./data/arbiKaMuallimPlaylist";
+import { HAJJ_PLAYLIST_ID, HAJJ_PLAYLIST_ITEMS } from "./data/hajjPlaylist";
 import { INSURANCE_PLAYLIST_ID, INSURANCE_PLAYLIST_ITEMS } from "./data/insurancePlaylist";
 import { LISANUL_QURAN_PLAYLIST_ID, LISANUL_QURAN_PLAYLIST_ITEMS } from "./data/lisanulQuranPlaylist";
+import { ILM_UN_NAHW_PLAYLIST_ID, ILM_UN_NAHW_PLAYLIST_ITEMS } from "./data/ilmUnNahwPlaylist";
+import { ILM_US_SARF_PLAYLIST_ID, ILM_US_SARF_PLAYLIST_ITEMS } from "./data/ilmUsSarfPlaylist";
 import { ISLAMIC_BASICS_PLAYLIST_ID, ISLAMIC_BASICS_PLAYLIST_ITEMS } from "./data/islamicBasicsPlaylist";
 import { MADANI_QAIDA_PLAYLIST_ID, MADANI_QAIDA_PLAYLIST_ITEMS } from "./data/madaniQaidaPlaylist";
+import { MUSLIM_SHARIF_PLAYLIST_ID, MUSLIM_SHARIF_PLAYLIST_ITEMS } from "./data/muslimSharifPlaylist";
 import { MUALIM_UL_QURAN_PLAYLIST_ID, MUALIM_UL_QURAN_PLAYLIST_ITEMS } from "./data/mualimUlQuranPlaylist";
-import { NOORANI_QAIDA_PLAYLIST_ID, NOORANI_QAIDA_PLAYLIST_ITEMS } from "./data/nooraniQaidaPlaylist";
+import { NOORANI_QAIDA_A_PLAYLIST_ID, NOORANI_QAIDA_A_PLAYLIST_ITEMS } from "./data/nooraniQaidaAPlaylist";
+import { NOORANI_QAIDA_B_PLAYLIST_ID, NOORANI_QAIDA_B_PLAYLIST_ITEMS } from "./data/nooraniQaidaBPlaylist";
 import { PROPHETIC_LIFE_PLAYLIST_ID, PROPHETIC_LIFE_PLAYLIST_ITEMS } from "./data/propheticLifePlaylist";
 import { PROPHETIC_PARENTING_PLAYLIST_ID, PROPHETIC_PARENTING_PLAYLIST_ITEMS } from "./data/propheticParentingPlaylist";
 import { SHORT_SEERAH_PLAYLIST_ID, SHORT_SEERAH_PLAYLIST_ITEMS } from "./data/shortSeerahPlaylist";
 import { SISTERS_TAJWEED_PLAYLIST_ID, SISTERS_TAJWEED_PLAYLIST_ITEMS } from "./data/sistersTajweedPlaylist";
 import { TAJWEED_COURSE_PLAYLIST_ID, TAJWEED_COURSE_PLAYLIST_ITEMS } from "./data/tajweedCoursePlaylist";
+import { TAJWEED_QIRAAT_PLAYLIST_ID, TAJWEED_QIRAAT_PLAYLIST_ITEMS } from "./data/tajweedQiraatPlaylist";
+import { USOOL_HADITH_PLAYLIST_ID, USOOL_HADITH_PLAYLIST_ITEMS } from "./data/usoolHadithPlaylist";
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  🎬  HOW TO ADD YOUR YOUTUBE VIDEOS
@@ -152,6 +163,7 @@ const PRIMARY_ADMIN_PASSWORD_HASH = "11ef569de49831adfc2176f885eee9b97c858782e28
 const LEGACY_DEMO_IDS = new Set(["nur_admin_demo", "nur_student_demo"]);
 const LEGACY_DEMO_EMAILS = new Set(["admin@nuracademy.com", "student@nuracademy.com"]);
 const WATCH_COMPLETE_THRESHOLD = 90;
+const CERTIFICATE_WATCH_THRESHOLD = 75;
 const WATCH_TICK_MS = 1000;
 const YT_API_SRC = "https://www.youtube.com/iframe_api";
 const BRAND_LOGO_SRC = `${import.meta.env.BASE_URL}favicon.png`;
@@ -178,6 +190,7 @@ const K = {
   DATA: "nur_data_v2",
   COURSES: "nur_courses_v1",
   YT_DURATIONS: "nur_youtube_durations_v1",
+  LOGIN_EMAIL: "nur_login_email_v1",
 };
 const clearNurBrowserData = () => {
   ls.remove(K.USERS);
@@ -188,6 +201,8 @@ const clearNurBrowserData = () => {
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const normalizeEmail = (value="") => value.trim().toLowerCase();
+const isPrimaryAdminEmail = (value="") => normalizeEmail(value) === PRIMARY_ADMIN_EMAIL;
+const isPrimaryAdminUser = (user) => Boolean(user) && (user.id === "nur_admin_primary" || isPrimaryAdminEmail(user.email));
 const pad = (value) => String(value).padStart(2, "0");
 const dayKey = (date=new Date()) => `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
 const parseDayKey = (value) => {
@@ -297,15 +312,14 @@ const Auth = {
       !LEGACY_DEMO_EMAILS.has(normalizeEmail(user.email))
     );
 
-    const existingAdminIndex = nextUsers.findIndex(
-      user => normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL
-    );
+    const existingAdminIndex = nextUsers.findIndex(user => isPrimaryAdminUser(user));
 
     if (existingAdminIndex >= 0) {
       const currentAdmin = nextUsers[existingAdminIndex];
       nextUsers[existingAdminIndex] = {
         ...currentAdmin,
-        name: PRIMARY_ADMIN_NAME,
+        id: currentAdmin.id || adminProfile.id,
+        name: currentAdmin.name || PRIMARY_ADMIN_NAME,
         email: PRIMARY_ADMIN_EMAIL,
         role: "admin",
         joinedAt: currentAdmin.joinedAt || adminProfile.joinedAt,
@@ -313,7 +327,7 @@ const Auth = {
         language: currentAdmin.language || adminProfile.language,
         blockedAt: null,
         blockedReason: "",
-        passwordHash: PRIMARY_ADMIN_PASSWORD_HASH,
+        passwordHash: currentAdmin.passwordHash || PRIMARY_ADMIN_PASSWORD_HASH,
       };
     } else {
       nextUsers = [adminProfile, ...nextUsers];
@@ -441,7 +455,7 @@ const Auth = {
     const users = Auth.users();
     const match = users.find(user => user.id === userId);
     if (!match) throw new Error("User not found.");
-    if (match.id === "nur_admin_primary" && role !== "admin") {
+    if (isPrimaryAdminUser(match) && role !== "admin") {
       throw new Error("The primary admin role cannot be removed.");
     }
     if (session?.id === userId && role !== "admin") {
@@ -458,7 +472,7 @@ const Auth = {
     const users = Auth.users();
     const match = users.find(user => user.id === userId);
     if (!match) throw new Error("User not found.");
-    if (match.id === "nur_admin_primary") {
+    if (isPrimaryAdminUser(match)) {
       throw new Error("The primary admin account cannot be blocked.");
     }
     if (session?.id === userId) {
@@ -476,12 +490,11 @@ const Auth = {
   deleteUser: (userId) => {
     if (!Auth.isAdmin()) throw new Error("Only administrators can delete users.");
     const session = Auth.session();
-    if (userId === "nur_admin_primary") throw new Error("The primary admin account cannot be deleted.");
-    if (session?.id === userId) throw new Error("You cannot delete the account you are using right now.");
-
     const users = Auth.users();
     const match = users.find(user => user.id === userId);
     if (!match) throw new Error("User not found.");
+    if (isPrimaryAdminUser(match)) throw new Error("The primary admin account cannot be deleted.");
+    if (session?.id === userId) throw new Error("You cannot delete the account you are using right now.");
 
     ls.set(K.USERS, users.filter(user => user.id !== userId));
     const allData = readAllUserData();
@@ -511,18 +524,24 @@ const Auth = {
     if (!session?.id) throw new Error("You need to sign in first.");
 
     const cleanedName = name.replace(/\s+/g, " ").trim();
-    const normalizedEmail = normalizeEmail(email);
-    if (!cleanedName) throw new Error("Please enter your name.");
-    if (!normalizedEmail) throw new Error("Please enter your email.");
     const users = Auth.users();
-    if (users.some(user => user.id !== session.id && user.email === normalizedEmail)) {
+    const currentUser = users.find(user => user.id === session.id);
+    const normalizedEmail = normalizeEmail(email);
+    const lockedPrimaryAdmin = isPrimaryAdminUser(currentUser);
+    const finalEmail = lockedPrimaryAdmin ? PRIMARY_ADMIN_EMAIL : normalizedEmail;
+    if (!cleanedName) throw new Error("Please enter your name.");
+    if (!finalEmail) throw new Error("Please enter your email.");
+    if (users.some(user => user.id !== session.id && user.email === finalEmail)) {
       throw new Error("Another account is already using that email.");
     }
 
     const nextUsers = users.map(user => user.id === session.id ? {
       ...user,
       name: cleanedName,
-      email: normalizedEmail,
+      email: finalEmail,
+      role: lockedPrimaryAdmin ? "admin" : user.role,
+      blockedAt: lockedPrimaryAdmin ? null : user.blockedAt,
+      blockedReason: lockedPrimaryAdmin ? "" : user.blockedReason,
       country: country.trim(),
       language: language.trim(),
     } : user);
@@ -556,7 +575,10 @@ const DB = {
       const currentWatch = { ...defaultWatchState(), ...(data.watch[lessonKey] || {}) };
       const duration = safeNum(info.duration, currentWatch.duration);
       const watchedSeconds = Math.max(currentWatch.watchedSeconds, safeNum(info.watchedSeconds, currentWatch.watchedSeconds));
-      const percent = Math.max(currentWatch.percent, safeNum(info.percent, 100));
+      const hasExplicitPercent = Number.isFinite(Number(info.percent));
+      const percent = hasExplicitPercent
+        ? Math.max(currentWatch.percent, safeNum(info.percent, currentWatch.percent))
+        : currentWatch.percent;
 
       data.watch[lessonKey] = {
         ...currentWatch,
@@ -652,37 +674,83 @@ const DB = {
 
 // ─── Course Data ─────────────────────────────────────────────────────────────
 // Helper builders
-const mkLesson = (id, title, ytId, dur, opts={}) => ({
-  id, title,
-  youtubeId: ytId,       // ← replace "DEMO" with real YouTube video ID
-  duration: dur,
-  free: opts.free || false,
-  description: opts.desc || "",
-  resources: opts.res || [],
-});
+const mkLesson = (id, title, ytId, dur, opts={}) => {
+  const normalizedYtId = typeof ytId === "string" ? ytId.trim() : ytId;
+  const normalizedDuration = typeof dur === "string" ? dur.trim() : dur;
+  return {
+    id,
+    title,
+    youtubeId: normalizedYtId,       // ← replace "DEMO" with real YouTube video ID
+    duration: normalizedDuration,
+    free: opts.free || false,
+    description: opts.desc || "",
+    resources: opts.res || [],
+  };
+};
 const mkModule = (id, title, icon, desc, lessons) => ({ id, title, icon, description: desc, lessons });
+const aqidahEnglishLessonTitle = ({ index }) => `Lecture ${pad(index)} - Islamic Theology ${pad(index)}`;
+const aqidahUrduLessonTitle = ({ index, sourceTitle }) => {
+  const parts = String(sourceTitle || "")
+    .split("|")
+    .map(part => part.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const topic = parts.find(part => !/^episode[:\s-]*\d+/i.test(part) && !/ghulam rasool|official|last episode|dars e/i.test(part)) || parts[1] || parts[0];
+  return `Lecture ${pad(index)} - ${topic || "Aqidah Lesson"}`;
+};
+const AQIDAH_MODULE_ICONS = ["☝️","🕌","📚","✨"];
+const buildAqidahModules = (items, opts={}) =>
+  chunk([...items].sort((a, b) => a.index - b.index), opts.groupSize || 5)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `aq${pad(item.index)}`,
+        opts.lessonTitle ? opts.lessonTitle(item) : `Lecture ${pad(item.index)} - Aqidah`,
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 2,
+          desc: `Imported from the ${opts.trackLabel || "Aqidah"} YouTube playlist.`,
+        }
+      ));
+
+      return mkModule(
+        `aqm${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lectures ${pad(start)}-${pad(end)}`,
+        AQIDAH_MODULE_ICONS[idx % AQIDAH_MODULE_ICONS.length],
+        `${opts.trackLabel || "Aqidah"} lectures ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
 const AQIDAH_DEFAULT_TRACK = "english";
 const AQIDAH_TRACKS = {
   english: {
     key: "english",
     label: "English",
-    note: "English Aqidah lectures and playlist.",
-    playlist: "PLdGFY6ZOJ73NLsvp6XBqR11tUMpWjXias",
-    lessonOverrides: {
-      l5a1: {
-        youtubeId: "TlZfpadeYzY",
-      },
+    note: "Full English Aqidah theology lecture series.",
+    playlist: AQIDAH_ENGLISH_PLAYLIST_ID,
+    modules: buildAqidahModules(AQIDAH_ENGLISH_PLAYLIST_ITEMS, {
+      trackLabel: "English Aqidah",
+      groupSize: 5,
+      lessonTitle: aqidahEnglishLessonTitle,
+    }),
+    coursePatch: {
+      instructor: "Dr. Bilal Philips",
     },
   },
   urdu: {
     key: "urdu",
     label: "Urdu",
-    note: "Urdu Aqidah lectures and playlist.",
-    playlist: "PLNzbRwIZdCEby9sHu5X9pT-QC6x4FpIEq",
-    lessonOverrides: {
-      l5a1: {
-        youtubeId: "DwmgvPfzFXs",
-      },
+    note: "Urdu Aqidah and Nazriyaat lecture series.",
+    playlist: AQIDAH_URDU_PLAYLIST_ID,
+    modules: buildAqidahModules(AQIDAH_URDU_PLAYLIST_ITEMS, {
+      trackLabel: "Urdu Aqidah",
+      groupSize: 3,
+      lessonTitle: aqidahUrduLessonTitle,
+    }),
+    coursePatch: {
+      instructor: "Allama Ghulam Rasool Qasmi",
     },
   },
 };
@@ -821,9 +889,16 @@ const QAIDA_TRACKS = {
   noorani: {
     key: "noorani",
     label: "Noorani Qaida",
-    note: "Noorani Qaida playlist with a full structured lesson set.",
-    playlist: NOORANI_QAIDA_PLAYLIST_ID,
-    modules: buildQaidaModules(NOORANI_QAIDA_PLAYLIST_ITEMS, { trackLabel: "Noorani Qaida" }),
+    note: "Full Noorani Qaida route using the 116-lesson playlist you shared.",
+    playlist: NOORANI_QAIDA_A_PLAYLIST_ID,
+    modules: buildQaidaModules(NOORANI_QAIDA_A_PLAYLIST_ITEMS, { trackLabel: "Noorani Qaida", groupSize: 12 }),
+  },
+  nooraniAlt: {
+    key: "nooraniAlt",
+    label: "Noorani Basics",
+    note: "Alternate 68-lesson Noorani Qaida playlist for a shorter route.",
+    playlist: NOORANI_QAIDA_B_PLAYLIST_ID,
+    modules: buildQaidaModules(NOORANI_QAIDA_B_PLAYLIST_ITEMS, { trackLabel: "Noorani Qaida Basics", groupSize: 12 }),
   },
 };
 
@@ -1217,7 +1292,286 @@ const buildPropheticParentingModules = (items) => [
     ))
   ),
 ];
+const cleanSourceTitle = (value="") => String(value || "").replace(/\s+/g, " ").trim();
+const tajweedQiraatLessonTitle = ({ index, sourceTitle }) => {
+  const cleaned = cleanSourceTitle(sourceTitle)
+    .replace(/Tajweed[- ]ul[- ]Qira'?at Course\s*I?/i, "")
+    .replace(/Hafiz Saeed Raza Baghdadi/i, "")
+    .replace(/\bEpisode\b[:\s-]*\d+/i, "")
+    .replace(/\s*\|\s*/g, " / ")
+    .replace(/^[\s\-/:]+|[\s\-/:]+$/g, "")
+    .trim();
 
+  return `Episode ${pad(index)} - ${cleaned || "Tajweed ul Qira'at"}`;
+};
+const buildTajweedQiraatModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 5)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l16${pad(item.index)}`,
+        tajweedQiraatLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 2,
+          desc: "Imported from Hafiz Saeed Raza Baghdadi's Tajweed ul Qira'at YouTube playlist.",
+        }
+      ));
+
+      return mkModule(
+        `m16${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Episodes ${pad(start)}-${pad(end)}`,
+        ["📖","🎙️","🟢","✨"][idx % 4],
+        `Tajweed ul Qira'at episodes ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const arbiKaMuallimLessonTitle = ({ index, sourceTitle }) => {
+  const cleaned = cleanSourceTitle(sourceTitle)
+    .replace(/^Arbi ka muallim\s*/i, "")
+    .replace(/^Book\s*/i, "Book ")
+    .replace(/^Part-?\s*(\d+)/i, "Book $1")
+    .replace(/Lecture no\.?\s*\d+/i, "")
+    .replace(/\(+/g, "")
+    .replace(/\)+/g, "")
+    .replace(/\/\/?/g, " / ")
+    .replace(/\s*\/\s*/g, " / ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s\-:/.]+|[\s\-:/.]+$/g, "")
+    .trim();
+
+  return `Lesson ${pad(index)} - ${cleaned || "Arbi ka Muallim"}`;
+};
+const ARBI_KA_MUALLIM_MODULE_BLUEPRINT = [
+  { title:"Module 1 - Book 1 Foundations", icon:"📘", desc:"Opening lessons from Arbi ka Muallim Book 1.", range:[1, 14] },
+  { title:"Module 2 - Book 2 Progression", icon:"🗣️", desc:"Arbi ka Muallim Book 2 lessons and early expansions.", range:[15, 26] },
+  { title:"Module 3 - Book 3 Part 1", icon:"🧠", desc:"The first half of Book 3 with grammar and sentence-building lessons.", range:[27, 41] },
+  { title:"Module 4 - Book 3 Part 2", icon:"✍️", desc:"The second half of Book 3 continuing applied Arabic study.", range:[42, 55] },
+  { title:"Module 5 - Book 4 Part 1", icon:"📚", desc:"Advanced Book 4 lessons from the public playlist.", range:[56, 81] },
+  { title:"Module 6 - Book 4 Part 2", icon:"🏁", desc:"Closing Book 4 lessons currently available on YouTube.", range:[82, 107] },
+];
+const buildArbiKaMuallimModules = (items) =>
+  ARBI_KA_MUALLIM_MODULE_BLUEPRINT.map((section, idx) => {
+    const [start, end] = section.range;
+    const lessons = items
+      .filter(item => item.index >= start && item.index <= end)
+      .map(item => mkLesson(
+        `l17${pad(item.index)}`,
+        arbiKaMuallimLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 3,
+          desc: "Imported from the Arbi ka Muallim Book 1 to 4 playlist by Amir Sohail.",
+        }
+      ));
+
+    return mkModule(
+      `m17${String.fromCharCode(97 + idx)}`,
+      section.title,
+      section.icon,
+      section.desc,
+      lessons
+    );
+  }).filter(section => section.lessons.length > 0);
+const aasanArabicGrammarLessonTitle = ({ index, sourceTitle }) => {
+  const cleaned = cleanSourceTitle(sourceTitle)
+    .replace(/\|\s*Lecture\s*\d+\s*\|.*$/i, "")
+    .replace(/^Lecture\s*\d+\s*:\s*/i, "")
+    .replace(/\s*\|\s*By:.*$/i, "")
+    .replace(/\s*\|\s*/g, " / ")
+    .trim();
+
+  return `Lesson ${pad(index)} - ${cleaned || "Arabic Grammar"}`;
+};
+const buildAasanArabicGrammarModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 14)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l18${pad(item.index)}`,
+        aasanArabicGrammarLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 3,
+          desc: "Imported from Asif Hameed's Aasan Arabic Grammar YouTube playlist.",
+        }
+      ));
+
+      return mkModule(
+        `m18${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["🧩","✒️","📚","🗣️","📖","🧠","📝","🏁"][idx % 8],
+        `Aasan Arabic Grammar lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const sarfLessonTitle = ({ index, sourceTitle }) => {
+  const parts = cleanSourceTitle(sourceTitle)
+    .split("|")
+    .map(part => part.trim())
+    .filter(Boolean);
+  const topic = [...parts].reverse().find(part => !/ilm us sarf|arabic grammar course|mufti muhammad|علم الصرف عربی گرائمر کورس/i.test(part));
+  return `Lesson ${pad(index)} - ${topic || "Ilm us Sarf"}`;
+};
+const buildIlmUsSarfModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 11)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l23${pad(item.index)}`,
+        sarfLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 3,
+          desc: "Imported from the Ilm us Sarf Arabic grammar playlist by Mufti Muhammad.",
+        }
+      ));
+
+      return mkModule(
+        `m23${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["🧩","🗣️","📘"][idx % 3],
+        `Ilm us Sarf lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const nahwLessonTitle = ({ index, sourceTitle }) => {
+  const parts = cleanSourceTitle(sourceTitle)
+    .split("||")
+    .map(part => part.trim())
+    .filter(Boolean);
+  const topic = parts.find(part => !/ilm un nahw|basic arabic grammar|course lec no|mufti muhammad/i.test(part)) || parts[1] || parts[0];
+  return `Lesson ${pad(index)} - ${topic || "Ilm un Nahw"}`;
+};
+const buildIlmUnNahwModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 7)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l24${pad(item.index)}`,
+        nahwLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 3,
+          desc: "Imported from the Ilm un Nahw Arabic grammar playlist by Mufti Muhammad.",
+        }
+      ));
+
+      return mkModule(
+        `m24${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["✍️","📚","🧠"][idx % 3],
+        `Ilm un Nahw lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const hajjLessonTitle = ({ index, sourceTitle }) => {
+  const cleaned = cleanSourceTitle(sourceTitle);
+  if (/promo/i.test(cleaned)) return `Lesson ${pad(index)} - Series Introduction`;
+  const episode = cleaned.match(/Ep\s*0?(\d+)/i);
+  const topic = cleaned
+    .replace(/Hajj Guide Step By Step/i, "")
+    .replace(/Ep\s*0?\d+/i, "")
+    .replace(/By Zaid Patel/i, "")
+    .replace(/- iPlus TV/i, "")
+    .replace(/--+/g, " ")
+    .replace(/^[\s\-:/.]+|[\s\-:/.]+$/g, "")
+    .trim();
+  return `Lesson ${pad(index)} - ${topic || `Hajj Guide${episode ? ` Episode ${episode[1]}` : ""}`}`;
+};
+const buildHajjModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 5)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l8h${pad(item.index)}`,
+        hajjLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 2,
+          desc: "Imported from Zaid Patel's Hajj Guide Step by Step playlist.",
+        }
+      ));
+
+      return mkModule(
+        `m8h${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["🕋","🧳","🌙"][idx % 3],
+        `Hajj guide lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const buildUmrahModules = () => [
+  mkModule(
+    "m21a",
+    "Module 1 - Umrah Guide",
+    "🕌",
+    "A guided Umrah overview and practical step-by-step lesson.",
+    [
+      mkLesson(
+        "l21a1",
+        "Lesson 01 - Umrah Overview & Practical Guide",
+        "VorGBNx9koY",
+        "15:00",
+        {
+          free: true,
+          desc: "Authentic Umrah guide lesson already linked in the app.",
+        }
+      ),
+    ]
+  ),
+];
+const usoolHadithLessonTitle = ({ index, sourceTitle }) => {
+  const raw = cleanSourceTitle(sourceTitle);
+  if (/promo/i.test(raw)) return `Lesson ${pad(index)} - Series Introduction`;
+  const episode = raw.match(/Episode\s*0?(\d+)/i);
+  return `Lesson ${pad(index)} - Usool e Hadith${episode ? ` Episode ${episode[1]}` : ""}`;
+};
+const muslimSharifLessonTitle = ({ index, sourceTitle }) => {
+  const range = cleanSourceTitle(sourceTitle).match(/Hadees No\s*([0-9]+)\s*to\s*([0-9]+)/i);
+  return `Lesson ${pad(index)} - ${range ? `Sahih Muslim Hadith ${range[1]}-${range[2]}` : "Sahih Muslim"}`;
+};
+const buildHadithSeriesModules = (items, opts={}) =>
+  chunk([...items].sort((a, b) => a.index - b.index), opts.groupSize || 8)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `${opts.lessonPrefix || "h"}${pad(item.index)}`,
+        opts.lessonTitle ? opts.lessonTitle(item) : `Lesson ${pad(item.index)}`,
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= (opts.freeCount || 2),
+          desc: opts.lessonDesc || "Imported from the linked YouTube playlist.",
+        }
+      ));
+
+      return mkModule(
+        `${opts.modulePrefix || "hm"}${String.fromCharCode(97 + idx)}`,
+        `${opts.seriesLabel} - Part ${idx + 1}`,
+        (opts.icons || ["📜","📘","🧠","✨"])[idx % (opts.icons || ["📜","📘","🧠","✨"]).length],
+        `${opts.seriesLabel} lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
 const COURSES = [
 
 {
@@ -1232,25 +1586,20 @@ const COURSES = [
     students: 1540, 
     price: 0, 
     isFree: true,
-    badge: "2 Lessons", 
+    badge: "Urdu", 
     badgeC: C.gold,
     thumb: "📖", 
     color: "#2D6A4F",
-    desc: "A short Tajweed ul Qira'at starter course using the two public lessons currently available from the playlist.",
-    playlist: "PLnxcNqv_D41uTY3YHHFPgoXsDrCQBz9Ge",
-    modules: [
-      mkModule("m16a", "Module 1 — Public Playlist Lessons", "🌟", "The first two public lessons currently available in the playlist.", [
-        mkLesson("l16a1", "Episode 1: Intro & Makharij", "GrwrpA2H97A", "27:35", { free: true }),
-        mkLesson("l16a2", "Episode 2: Arabic Alphabet", "iQ5OCVbHVjk", "25:00", { free: true }),
-      ]),
-    ],
+    desc: "A complete Tajweed ul Qira'at course covering all 20 currently public episodes from the playlist you shared.",
+    playlist: TAJWEED_QIRAAT_PLAYLIST_ID,
+    modules: buildTajweedQiraatModules(TAJWEED_QIRAAT_PLAYLIST_ITEMS),
   },
   {
     id:2, slug:"tajweed-course",
     title:"Tajweed Course", titleAr:"علم التجويد",
     instructor:"Qari Aqib", category:"Quran", level:"Intermediate",
     rating:4.9, students:4120, price:0, isFree:true,
-    badge:"34 Videos", badgeC:C.gold,
+    badge:"Urdu", badgeC:C.gold,
     thumb:"📖", color:"#1A6B4E",
     desc:"A complete Urdu Tajweed video series covering terminology, noon sakinah and tanween, meem sakin, idgham families, hamza rules, and advanced Quran-reading cases.",
     playlist:TAJWEED_COURSE_PLAYLIST_ID,
@@ -1261,18 +1610,62 @@ const COURSES = [
     title:"Lisan ul Quran", titleAr:"لسان القرآن",
     instructor:"Amir Sohail", category:"Arabic", level:"Intermediate",
     rating:4.9, students:4320, price:0, isFree:true,
-    badge:"72 Lectures", badgeC:C.gold,
+    badge:"Arabic", badgeC:C.gold,
     thumb:"🗣️", color:"#22577A",
     desc:"A full Lisan ul Quran series covering Quranic Arabic grammar, noun patterns, nominal and verbal sentences, jussive and passive forms, and advanced applied structures.",
     playlist:LISANUL_QURAN_PLAYLIST_ID,
     modules:buildLisanModules(LISANUL_QURAN_PLAYLIST_ITEMS),
   },
   {
+    id:17, slug:"arbi-ka-muallim-book-1-4",
+    title:"Arbi ka Muallim Book 1 to 4", titleAr:"عربی کا معلم",
+    instructor:"Amir Sohail", category:"Arabic", level:"Beginner",
+    rating:4.9, students:2980, price:0, isFree:true,
+    badge:"Arabic", badgeC:C.gold,
+    thumb:"📚", color:"#6C5A3B",
+    desc:"A long Arabic-learning pathway covering Arbi ka Muallim Books 1 to 4 through the public playlist lessons currently available on YouTube.",
+    playlist:ARBI_KA_MUALLIM_PLAYLIST_ID,
+    modules:buildArbiKaMuallimModules(ARBI_KA_MUALLIM_PLAYLIST_ITEMS),
+  },
+  {
+    id:18, slug:"aasan-arabic-grammar",
+    title:"Aasan Arabic Grammar", titleAr:"آسان عربی قواعد",
+    instructor:"Asif Hameed", category:"Arabic", level:"Intermediate",
+    rating:4.9, students:3210, price:0, isFree:true,
+    badge:"Grammar", badgeC:C.gold,
+    thumb:"🧠", color:"#7A4F2A",
+    desc:"A full Arabic grammar course covering nouns, compounds, jumla ismiyyah, pronouns, verbs, and applied Quranic parsing across the full public playlist.",
+    playlist:AASAN_ARABIC_GRAMMAR_PLAYLIST_ID,
+    modules:buildAasanArabicGrammarModules(AASAN_ARABIC_GRAMMAR_PLAYLIST_ITEMS),
+  },
+  {
+    id:23, slug:"ilm-us-sarf",
+    title:"Ilm us Sarf", titleAr:"علم الصرف",
+    instructor:"Mufti Muhammad", category:"Arabic", level:"Beginner",
+    rating:4.8, students:1840, price:0, isFree:true,
+    badge:"Morphology", badgeC:C.gold,
+    thumb:"🔤", color:"#6E4A2F",
+    desc:"A structured Arabic morphology course covering the foundations of Ilm us Sarf through the full public playlist lessons.",
+    playlist:ILM_US_SARF_PLAYLIST_ID,
+    modules:buildIlmUsSarfModules(ILM_US_SARF_PLAYLIST_ITEMS),
+  },
+  {
+    id:24, slug:"ilm-un-nahw",
+    title:"Ilm un Nahw", titleAr:"علم النحو",
+    instructor:"Mufti Muhammad", category:"Arabic", level:"Beginner",
+    rating:4.8, students:1710, price:0, isFree:true,
+    badge:"Syntax", badgeC:C.gold,
+    thumb:"✒️", color:"#4E6A5E",
+    desc:"A beginner-friendly Arabic syntax course covering core Nahw topics through the linked playlist lessons.",
+    playlist:ILM_UN_NAHW_PLAYLIST_ID,
+    modules:buildIlmUnNahwModules(ILM_UN_NAHW_PLAYLIST_ITEMS),
+  },
+  {
     id:10, slug:"mualim-ul-quran",
     title:"Mualim ul Quran", titleAr:"معلم القرآن",
     instructor:"Hamza Sabherwal & Dr. Ubaid", category:"Quran", level:"Beginner",
     rating:4.9, students:3870, price:0, isFree:true,
-    badge:"30 Lessons", badgeC:C.gold,
+    badge:"Guided", badgeC:C.gold,
     thumb:"📙", color:"#2F6F4F",
     desc:"A structured Muallim ul Quran challenge focused on understanding Quran directly in six months through guided lessons, homework checkpoints, revision sessions, and test-based practice.",
     playlist:MUALIM_UL_QURAN_PLAYLIST_ID,
@@ -1294,7 +1687,7 @@ const COURSES = [
     title:"Prophetic (SAW) Life", titleAr:"الحياة النبوية",
     instructor:"Shaykh Abdul-Rahim Reasat", category:"Seerah", level:"Intermediate",
     rating:4.9, students:2480, price:0, isFree:true,
-    badge:"100 Lessons", badgeC:C.gold,
+    badge:"Detailed", badgeC:C.gold,
     thumb:"🕯️", color:"#3C5B6F",
     desc:"A detailed Prophetic Life in Focus series tracing the blessed life of the Messenger from Arabia before Islam through the major stages of his mission.",
     playlist:PROPHETIC_LIFE_PLAYLIST_ID,
@@ -1305,7 +1698,7 @@ const COURSES = [
     title:"Prophetic Parenting", titleAr:"التربية النبوية",
     instructor:"Shaykh Faraz Rabbani", category:"Family", level:"All Levels",
     rating:4.9, students:1280, price:0, isFree:true,
-    badge:"5 Sessions", badgeC:C.gold,
+    badge:"Family", badgeC:C.gold,
     thumb:"👨‍👩‍👧",
     color:"#6B4F3B",
     desc:"A concise Prophetic Parenting series on raising righteous Muslim children through forty hadith-based reflections and a closing Q&A.",
@@ -1313,96 +1706,62 @@ const COURSES = [
     modules:buildPropheticParentingModules(PROPHETIC_PARENTING_PLAYLIST_ITEMS),
   },
   {
-    id:5, slug:"aqidah-course",
-    title:"Aqidah Course", titleAr:"علم العقيدة",
-    instructor:"Sheikh Bilal Philips", category:"Aqidah", level:"Beginner",
-    rating:4.8, students:2760, price:59, isFree:false,
-    badge:"Essential", badgeC:"#7B3F00",
-    thumb:"⭐", color:"#2D6A4F",
-    desc:"Establish a firm foundation in Islamic belief. Tawheed, Six Pillars of Iman, and core Islamic theology, with English and Urdu study tracks available at enrollment.",
-    playlist:AQIDAH_TRACKS.english.playlist,
-    defaultTrack:AQIDAH_DEFAULT_TRACK,
-    trackOptions:AQIDAH_TRACKS,
-    modules:[
-      mkModule("m5a","Module 1 — Tawheed","☝️","Pure Monotheism — the most important knowledge",[
-        mkLesson("l5a1","Introduction to Aqidah",AQIDAH_TRACKS.english.lessonOverrides.l5a1.youtubeId,"15:00",{free:true,desc:"Why Aqidah is the foundation of everything."}),
-        mkLesson("l5a2","Tawheed Al-Rububiyyah","DEMO","22:00",{desc:"Oneness of Allah's Lordship."}),
-        mkLesson("l5a3","Tawheed Al-Uluhiyyah","DEMO","24:00",{desc:"Oneness in worship — the central message of all prophets."}),
-        mkLesson("l5a4","Allah's Names & Attributes","DEMO","26:00",{desc:"What the Names and Attributes mean and do not mean.",res:["99 Names of Allah.pdf"]}),
-      ]),
-      mkModule("m5b","Module 2 — Pillars of Iman","🏛️","The six pillars every Muslim must know",[
-        mkLesson("l5b1","Belief in Allah & His Angels","DEMO","20:00",{desc:"Foundations of belief in the unseen."}),
-        mkLesson("l5b2","Belief in the Books & Prophets","DEMO","22:00",{desc:"Divine scriptures and all 25 named prophets.",res:["Divine Books.pdf"]}),
-        mkLesson("l5b3","Belief in the Last Day","DEMO","25:00",{desc:"Death, resurrection, judgment, Paradise and Hell."}),
-        mkLesson("l5b4","Belief in Divine Decree (Qada & Qadar)","DEMO","22:00",{desc:"Allah's complete knowledge and will.",res:["Qada Qadar Notes.pdf"]}),
-      ]),
-    ],
-  },
-  {
     id:6, slug:"learn-qaida",
     title:"Qaida Course", titleAr:"دورة القاعدة",
-    instructor:"Madani & Noorani Instructors", category:"Quran", level:"Beginner",
-    rating:4.9, students:5480, price:0, isFree:true,
-    badge:"2 Tracks", badgeC:C.gold,
+    instructor:"Nur Academy Qaida Faculty", category:"Quran", level:"Beginner",
+    rating:4.9, students:5960, price:0, isFree:true,
+    badge:"3 Paths", badgeC:C.gold,
     thumb:"🌟", color:C.em,
-    desc:"Choose either the Madani Qaida or Noorani Qaida study path from one course card and follow the full lesson library for your selected qaida.",
+    desc:"Choose the Madani Qaida, full Noorani Qaida, or shorter Noorani Basics route. All three tracks now use the linked YouTube playlists directly inside one Qaida course card.",
     playlist:QAIDA_TRACKS.madani.playlist,
     defaultTrack:QAIDA_DEFAULT_TRACK,
     trackOptions:QAIDA_TRACKS,
     modules:QAIDA_TRACKS.madani.modules,
   },
   {
-    id:7, slug:"hadith-studies",
-    title:"Hadith Studies", titleAr:"دراسة الحديث النبوي",
-    instructor:"Dr. Yasir Qadhi", category:"Hadith", level:"Intermediate",
-    rating:4.7, students:1640, price:69, isFree:false,
-    badge:null, thumb:"📜", color:"#1B4332",
-    desc:"Study the prophetic traditions authentically. Covers 40 Hadith of Imam Nawawi with in-depth explanation.",
-    playlist:"PLsF39TzFrYcVlBmGk7c6eIhFotjljcvCZ",
-    modules:[
-      mkModule("m7a","Module 1 — Hadith Sciences","🔬","How Hadith were preserved and authenticated",[
-        mkLesson("l7a1","What is a Hadith?","jx3AIBGRQKI","18:00",{free:true,desc:"Definition, structure (isnad + matn), importance."}),
-        mkLesson("l7a2","Classification of Hadith","DEMO","22:00",{desc:"Sahih, Hasan, Da'eef — grading system explained.",res:["Classification Chart.pdf"]}),
-        mkLesson("l7a3","Major Hadith Collections","DEMO","20:00",{desc:"Bukhari, Muslim, the Six Books and their significance."}),
-      ]),
-      mkModule("m7b","Module 2 — 40 Hadith Nawawi","📚","The 40 most important Hadith explained",[
-        mkLesson("l7b1","Hadith 1-5: Foundations of Deen","DEMO","30:00",{desc:"Intentions, Islam/Iman/Ihsan, permissible & forbidden.",res:["Hadith 1-5 Notes.pdf"]}),
-        mkLesson("l7b2","Hadith 6-15: Rights & Character","DEMO","32:00",{desc:"Rights of Allah and people, Islamic ethics."}),
-        mkLesson("l7b3","Hadith 16-30: Conduct & Piety","DEMO","30:00",{desc:"Leaving doubt, simplicity, and the middle path.",res:["Hadith 16-30 Notes.pdf"]}),
-        mkLesson("l7b4","Hadith 31-42: Complete Review","DEMO","35:00",{desc:"Final Hadith with discussion and applications.",res:["Complete 40 Hadith Booklet.pdf"]}),
-      ]),
-    ],
+    id:7, slug:"usool-e-hadith",
+    title:"Usool e Hadith", titleAr:"أصول الحديث",
+    instructor:"Shaikh Noorul Hasan Madani", category:"Hadith", level:"Intermediate",
+    rating:4.8, students:1640, price:0, isFree:true,
+    badge:"Hadith", badgeC:C.gold, thumb:"📜", color:"#1B4332",
+    desc:"A full Usool e Hadith course covering the preservation, terminology, and foundations of the Hadith sciences.",
+    playlist:USOOL_HADITH_PLAYLIST_ID,
+    modules:buildHadithSeriesModules(USOOL_HADITH_PLAYLIST_ITEMS, {
+      seriesLabel: "Usool e Hadith",
+      lessonPrefix: "l7u",
+      modulePrefix: "m7u",
+      groupSize: 8,
+      freeCount: 2,
+      lessonTitle: usoolHadithLessonTitle,
+      lessonDesc: "Imported from the Usool e Hadith playlist by Shaikh Noorul Hasan Madani.",
+      icons: ["🔬","📚","🧠","🕯️"],
+    }),
   },
   {
-    id:8, slug:"hajj-umrah",
-    title:"Hajj & Umrah", titleAr:"الحج والعمرة",
-    instructor:"Sheikh Assim Al-Hakeem", category:"Fiqh", level:"All Levels",
-    rating:4.9, students:3890, price:0, isFree:true,
-    badge:"Free", badgeC:C.em,
-    thumb:"🕋", color:"#0D4F3C",
-    desc:"Choose either a Hajj or Umrah learning path from one course card, then study the rulings and practical steps for your selected pilgrimage.",
-    playlist:HAJJ_UMRAH_TRACKS.hajj.playlist,
-    defaultTrack:HAJJ_UMRAH_DEFAULT_TRACK,
-    trackOptions:HAJJ_UMRAH_TRACKS,
-    modules:[
-      mkModule("m8a","Module 1 — Preparing for Pilgrimage","🧳","Preparation, intention, and entering ihram.",[
-        mkLesson("l8a1","Pilgrimage Overview & Virtues","cp_ISpIv_wA","15:00",{free:true,desc:"An opening overview of the chosen pilgrimage path and its virtues."}),
-        mkLesson("l8a2","Conditions, Pillars & Obligations","DEMO","20:00",{desc:"The key conditions, pillars, and obligations every pilgrim should know.",res:["Pilgrimage Checklist.pdf"]}),
-        mkLesson("l8a3","Entering Ihram","DEMO","22:00",{desc:"Miqat stations, ghusl, wearing ihram, and beginning the rite correctly.",res:["Ihram Guide.pdf"]}),
-      ]),
-      mkModule("m8b","Module 2 — Main Rituals","🕋","The central acts of the selected pilgrimage journey.",[
-        mkLesson("l8b1","Main Rituals — Step by Step","DEMO","25:00",{desc:"Follow the main rites in sequence with practical guidance.",res:["Tawaf Duas.pdf"]}),
-        mkLesson("l8b2","Movement Between Sacred Sites","DEMO","22:00",{desc:"Understand the essential movement, order, and key actions of the journey.",res:["Sa'i Guide.pdf"]}),
-        mkLesson("l8b3","Completion & Common Mistakes","DEMO","20:00",{desc:"How to complete the pilgrimage correctly and avoid common mistakes.",res:["Complete Dua Booklet.pdf"]}),
-      ]),
-    ],
+    id:22, slug:"sahih-muslim",
+    title:"Sahih Muslim", titleAr:"صحيح مسلم",
+    instructor:"Sunnat Pak", category:"Hadith", level:"Intermediate",
+    rating:4.8, students:1540, price:0, isFree:true,
+    badge:"Hadith", badgeC:C.gold, thumb:"📚", color:"#415A77",
+    desc:"A standalone Sahih Muslim course using the Urdu translation playlist you shared.",
+    playlist:MUSLIM_SHARIF_PLAYLIST_ID,
+    modules:buildHadithSeriesModules(MUSLIM_SHARIF_PLAYLIST_ITEMS, {
+      seriesLabel: "Sahih Muslim",
+      lessonPrefix: "l7m",
+      modulePrefix: "m7m",
+      groupSize: 10,
+      freeCount: 1,
+      lessonTitle: muslimSharifLessonTitle,
+      lessonDesc: "Imported from the Sahih Muslim Urdu translation playlist.",
+      icons: ["📗","📙","📕","📘","📚","✨","🕯️","🏁"],
+    }),
   },
   {
     id:9, slug:"islamic-basics",
     title:"Islamic Basics", titleAr:"أساسيات الإسلام",
     instructor:"Think Arabic", category:"Fiqh", level:"Beginner",
     rating:4.8, students:6100, price:0, isFree:true,
-    badge:"18 Lessons", badgeC:C.gold,
+    badge:"Beginner", badgeC:C.gold,
     thumb:"☪️", color:C.em,
     desc:"A beginner-friendly YouTube course covering Islamic beliefs, conversion, purification, the five daily prayers, first mosque steps, and essential recitations for new learners.",
     playlist:ISLAMIC_BASICS_PLAYLIST_ID,
@@ -1413,7 +1772,7 @@ const COURSES = [
     title:"Insurance Rulings", titleAr:"أحكام التأمين",
     instructor:"Sheikh Aziz bin Farhan Al Anizi", category:"Fiqh", level:"Intermediate",
     rating:4.8, students:920, price:0, isFree:true,
-    badge:"4 Lessons", badgeC:C.gold,
+    badge:"Fiqh", badgeC:C.gold,
     thumb:"🛡️", color:"#4C6A5A",
     desc:"A concise fiqh mini-course answering common questions about car insurance, extended warranties, garage claim differences, and fully comprehensive cover.",
     playlist:INSURANCE_PLAYLIST_ID,
@@ -1510,6 +1869,12 @@ const writeCustomCourses = (updater) => {
 };
 const getCourseCatalog = () => [...COURSES, ...readCustomCourses()];
 const getNextCourseId = () => getCourseCatalog().reduce((max, course) => Math.max(max, safeNum(course.id, 0)), 0) + 1;
+const prunePlaceholderModules = (modules=[]) => modules
+  .map(module => ({
+    ...module,
+    lessons: module.lessons.filter(lesson => Boolean(getYtId(lesson.youtubeId))),
+  }))
+  .filter(module => module.lessons.length > 0);
 const pruneStoredCourseData = () => {
   const validCourseIds = new Set(getCourseCatalog().map(course => String(course.id)));
   const allData = readAllUserData();
@@ -1559,23 +1924,32 @@ const resolveCourse = (courseLike) => {
     (course.slug && course.slug === courseLike.slug)
   ) || courseLike;
 
-  if (!baseCourse.trackOptions) return baseCourse;
+  if (!baseCourse.trackOptions) {
+    return baseCourse.hidePlaceholderLessons
+      ? { ...baseCourse, modules: prunePlaceholderModules(baseCourse.modules) }
+      : baseCourse;
+  }
 
   const trackKey = selectCourseTrackKey(baseCourse, courseLike.selectedTrackKey);
   const track = trackKey ? baseCourse.trackOptions[trackKey] : null;
   if (!track) return baseCourse;
+  const rawModules = track.modules?.length
+    ? track.modules
+    : applyTrackToModules(baseCourse.modules, track.lessonOverrides || {}, track.moduleOverrides || {});
 
-  return {
+  const resolvedCourse = {
     ...baseCourse,
     ...(track.coursePatch || {}),
     selectedTrackKey: trackKey,
     selectedTrackLabel: track.label,
     selectedTrackNote: track.note || "",
     playlist: track.playlist || baseCourse.playlist,
-    modules: track.modules?.length
-      ? track.modules
-      : applyTrackToModules(baseCourse.modules, track.lessonOverrides || {}, track.moduleOverrides || {}),
+    modules: namespaceModules(rawModules, `track-${baseCourse.id}-${trackKey}`),
   };
+
+  return resolvedCourse.hidePlaceholderLessons
+    ? { ...resolvedCourse, modules: prunePlaceholderModules(resolvedCourse.modules) }
+    : resolvedCourse;
 };
 const AdminDB = {
   users: () => [...Auth.users()].sort((a, b) => {
@@ -1709,12 +2083,40 @@ const flatLessons = (course) => {
   return out;
 };
 const totalLessons = (c) => c.modules.reduce((a,m) => a+m.lessons.length, 0);
+const namespaceModules = (modules=[], prefix="") => {
+  if (!prefix) return modules;
+  return modules.map(module => ({
+    ...module,
+    id: `${prefix}-${module.id}`,
+    lessons: module.lessons.map(lesson => ({
+      ...lesson,
+      id: `${prefix}-${lesson.id}`,
+    })),
+  }));
+};
+const courseDoneIds = (course, rawDoneIds=[]) => {
+  if (!course) return [];
+  const lessonIds = new Set(flatLessons(course).map(lesson => lesson.id));
+  return (rawDoneIds || []).filter(id => lessonIds.has(id));
+};
+const courseProgressStats = (course, rawDoneIds=course ? DB.progress(course.id) : []) => {
+  const total = course ? totalLessons(course) : 0;
+  const doneIds = courseDoneIds(course, rawDoneIds);
+  const completed = doneIds.length;
+  return {
+    doneIds,
+    completed,
+    total,
+    pct: total > 0 ? Math.round(completed / total * 100) : 0,
+  };
+};
 const getYtId = (v) => {
-  if (!v || v==="DEMO") return null;
+  const raw = typeof v === "string" ? v.trim() : v;
+  if (!raw || raw==="DEMO") return null;
   for (const p of [/[?&]v=([^&#]+)/,/youtu\.be\/([^?&#]+)/,/embed\/([^?&#]+)/,/shorts\/([^?&#]+)/]) {
-    const m = v.match(p); if (m) return m[1];
+    const m = raw.match(p); if (m) return m[1];
   }
-  return /^[a-zA-Z0-9_-]{11}$/.test(v) ? v : null;
+  return /^[a-zA-Z0-9_-]{11}$/.test(raw) ? raw : null;
 };
 const YT_DURATION_EVENT = "nur:yt-duration";
 const MAX_DURATION_PROBES = 3;
@@ -1736,6 +2138,56 @@ const readYouTubeDurationCache = () => {
   if (ytDurationCache) return ytDurationCache;
   ytDurationCache = typeof window === "undefined" ? {} : ls.get(K.YT_DURATIONS, {});
   return ytDurationCache;
+};
+const parseDurationLabel = (value="") => {
+  const parts = String(value || "").trim().split(":").map(part => Number(part));
+  if (!parts.length || parts.some(part => !Number.isFinite(part))) return 0;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 1) return parts[0];
+  return 0;
+};
+const courseWatchStats = (course) => {
+  if (!course) return { averagePct:0, eligible:false, trackedLessons:0, watchedSeconds:0, totalSeconds:0 };
+
+  const trackableLessons = flatLessons(course).filter(lesson => Boolean(getYtId(lesson.youtubeId)));
+  if (!trackableLessons.length) {
+    return { averagePct:100, eligible:true, trackedLessons:0, watchedSeconds:0, totalSeconds:0 };
+  }
+
+  let watchedSeconds = 0;
+  let totalSeconds = 0;
+  const durationCache = readYouTubeDurationCache();
+
+  trackableLessons.forEach(lesson => {
+    const watch = DB.watch(course.id, lesson.id);
+    const videoId = getYtId(lesson.youtubeId);
+    const duration = Math.max(
+      safeNum(watch.duration, 0),
+      parseDurationLabel(videoId ? durationCache[videoId] : ""),
+      parseDurationLabel(lesson.duration),
+      1
+    );
+    const lessonWatched = Math.min(
+      duration,
+      Math.max(
+        safeNum(watch.watchedSeconds, 0),
+        Math.round(duration * Math.max(0, safeNum(watch.percent, 0)) / 100)
+      )
+    );
+
+    totalSeconds += duration;
+    watchedSeconds += lessonWatched;
+  });
+
+  const averagePct = totalSeconds > 0 ? Math.round(watchedSeconds / totalSeconds * 100) : 0;
+  return {
+    averagePct,
+    eligible: averagePct >= CERTIFICATE_WATCH_THRESHOLD,
+    trackedLessons: trackableLessons.length,
+    watchedSeconds,
+    totalSeconds,
+  };
 };
 const persistYouTubeDurationCache = (cache) => {
   ytDurationCache = cache;
@@ -2219,6 +2671,9 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
   const [fallback, setFallback] = useState(false);
   const [playerError, setPlayerError] = useState(null);
   const watchUrl = id ? `https://www.youtube.com/watch?v=${id}${playlistId ? `&list=${playlistId}` : ""}` : "#";
+  const embedSrc = id
+    ? `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1${playlistId ? `&list=${encodeURIComponent(playlistId)}` : ""}`
+    : "";
 
   useEffect(() => {
     watchedRef.current = safeNum(initialWatchSeconds, 0);
@@ -2229,6 +2684,7 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
     if (!id || !mountRef.current) return;
 
     let cancelled = false;
+    let playerReady = false;
     setFallback(false);
     setPlayerError(null);
 
@@ -2270,10 +2726,26 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
       tickRef.current = window.setInterval(() => emitProgress(target), WATCH_TICK_MS);
     };
 
+    const fallbackToIframe = () => {
+      if (cancelled) return;
+      clearTick();
+      onTrackingChange?.(false);
+      try {
+        playerRef.current?.destroy?.();
+      } catch {}
+      playerRef.current = null;
+      setFallback(true);
+    };
+
+    const bootTimer = window.setTimeout(() => {
+      if (!playerReady) fallbackToIframe();
+    }, 4500);
+
     loadYouTubeAPI().then(YT => {
       if (cancelled || !mountRef.current || !mountRef.current.contains(host)) return;
       onTrackingChange?.(true);
       playerRef.current = new YT.Player(host, {
+        host: "https://www.youtube-nocookie.com",
         videoId: id,
         width: "100%",
         height: "100%",
@@ -2281,9 +2753,14 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
           rel: 0,
           modestbranding: 1,
           playsinline: 1,
+          ...(typeof window !== "undefined" && window.location?.origin
+            ? { origin: window.location.origin }
+            : {}),
         },
         events: {
           onReady: (event) => {
+            playerReady = true;
+            window.clearTimeout(bootTimer);
             const resumeAt = safeNum(initialWatchSeconds, 0);
             const duration = Math.max(0, safeNum(event.target.getDuration?.(), 0));
             if (duration > 0) cacheYouTubeDuration(id, duration);
@@ -2304,6 +2781,8 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
             clearTick();
           },
           onError: (event) => {
+            playerReady = true;
+            window.clearTimeout(bootTimer);
             const code = safeNum(event?.data, 0);
             clearTick();
             setPlayerError(code);
@@ -2317,12 +2796,14 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
         },
       });
     }).catch(() => {
+      window.clearTimeout(bootTimer);
       setFallback(true);
       onTrackingChange?.(false);
     });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(bootTimer);
       clearTick();
       try {
         if (playerRef.current?.destroy) playerRef.current.destroy();
@@ -2379,7 +2860,7 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
     return (
       <iframe
         style={{width:"100%",height:"100%",border:"none",display:"block"}}
-        src={`https://www.youtube.com/embed/${id}?enablejsapi=1&rel=0&modestbranding=1&color=white`}
+        src={embedSrc}
         title={title}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
@@ -2455,9 +2936,8 @@ const CourseCard = ({ course, onClick }) => {
   const viewerId = currentUserId();
   useEffect(() => {
     const sync = () => {
-      const tot = totalLessons(displayCourse);
-      const dn = DB.progress(displayCourse.id).length;
-      setPct(tot>0 ? Math.round(dn/tot*100) : 0);
+      const stats = courseProgressStats(displayCourse);
+      setPct(stats.pct);
       setEnrolled(DB.isEnrolled(displayCourse.id));
     };
 
@@ -2703,7 +3183,7 @@ const Footer = () => (
           </div>
         </div>
         {[
-          {t:"Courses",ls:["Tajweed ul Qira'at","Arabic Language","Short Seerah","Aqidah","Islamic Basics"]},
+          {t:"Courses",ls:["Tajweed ul Qira'at","Qaida Course","Short Seerah","Arabic Grammar","Islamic Basics"]},
           {t:"Platform",ls:["About Us","Instructors","Blog","Contact","Certificates"]},
           {t:"Support", ls:["Help Center","Community","Privacy Policy","Terms"]},
         ].map(col=>(
@@ -2732,6 +3212,7 @@ const Footer = () => (
 // ─── HOME ─────────────────────────────────────────────────────────────────────
 const HomePage = ({ setPage, setCourse }) => {
   const courseCatalog = getCourseCatalog();
+  const displayCatalog = courseCatalog.map(course => resolveCourse(course));
   const [ti, setTi] = useState(0);
   const testimonials = [
     {name:"Aisha Rahman",role:"Student, USA",text:"Nur Academy transformed my relationship with the Quran. The Tajweed course was exceptional — I now recite with real confidence. JazakAllahu Khayran!",av:"A"},
@@ -2765,7 +3246,7 @@ const HomePage = ({ setPage, setCourse }) => {
               <Btn size="lg" onClick={()=>setPage("register")} style={{background:"rgba(255,255,255,.1)",color:"white",border:"1px solid rgba(255,255,255,.3)",borderRadius:10}}>Join Free Today</Btn>
             </div>
             <div className="home-stat-row" style={{display:"flex",gap:28}}>
-              {[{v:`${courseCatalog.filter(c=>c.isFree).length}`,l:"Free Courses"},{v:String(courseCatalog.length),l:"Total Courses"},{v:String(courseCatalog.reduce((a,c)=>a+c.modules.length,0)),l:"Modules"},{v:"🔥",l:"Streak System"}].map((s,i)=>(
+              {[{v:`${displayCatalog.filter(c=>c.isFree).length}`,l:"Free Courses"},{v:String(displayCatalog.length),l:"Total Courses"},{v:String(displayCatalog.reduce((a,c)=>a+c.modules.length,0)),l:"Modules"},{v:"🔥",l:"Streak System"}].map((s,i)=>(
                 <div key={i} style={{textAlign:"center"}}>
                   <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.4rem",fontWeight:700,color:C.gold}}>{s.v}</div>
                   <div style={{fontSize:".68rem",color:"rgba(255,255,255,.48)",textTransform:"uppercase",letterSpacing:".05em"}}>{s.l}</div>
@@ -2784,7 +3265,7 @@ const HomePage = ({ setPage, setCourse }) => {
                   <div style={{color:C.goldL,fontSize:".7rem"}}>Complete a lesson daily to keep it</div>
                 </div>
               </div>
-              {courseCatalog.slice(0,2).map((c,i)=>(
+              {displayCatalog.slice(0,2).map((c,i)=>(
                 <div key={i} style={{background:"rgba(255,255,255,.05)",borderRadius:10,padding:"11px 14px",marginBottom:8,border:"1px solid rgba(255,255,255,.08)"}}>
                   <div style={{display:"flex",gap:9,alignItems:"center",marginBottom:7}}>
                     <span style={{fontSize:"1.2rem"}}>{c.thumb}</span>
@@ -2950,15 +3431,18 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
 
   const courseData = courseView;
   const trackChoices = courseData?.trackOptions ? Object.entries(courseData.trackOptions) : [];
-
-  const tot = courseData ? totalLessons(courseData) : 0;
-  const dn  = doneIds.length;
-  const pct = tot>0 ? Math.round(dn/tot*100) : 0;
+  const progress = courseData ? courseProgressStats(courseData, doneIds) : { doneIds:[], completed:0, total:0, pct:0 };
+  const completion = courseData ? DB.courseCompletion(courseData.id) : null;
+  const completedIds = progress.doneIds;
+  const tot = progress.total;
+  const dn  = progress.completed;
+  const pct = progress.pct;
+  const nextLesson = courseData ? flatLessons(courseData).find(item => !completedIds.includes(item.id)) || flatLessons(courseData)[0] : null;
   useEffect(() => {
-    if (courseData && pct === 100) {
+    if (courseData && completion) {
       setPage("certificate");
     }
-  }, [courseData?.id, courseData?.selectedTrackKey, pct, setPage]);
+  }, [completion?.certificateId, courseData?.id, courseData?.selectedTrackKey, setPage]);
 
   if (!courseData) return null;
 
@@ -2982,6 +3466,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
         <Iso op={0.07} col={C.gold}/>
         <div className="split-grid" style={{maxWidth:1200,margin:"0 auto",gridTemplateColumns:"1fr auto",gap:34,alignItems:"start",position:"relative",zIndex:1}}>
           <div>
+            <Btn v="dark" size="sm" style={{marginBottom:14}} onClick={() => setPage("courses")}>← Back to Courses</Btn>
             <div style={{display:"flex",gap:6,marginBottom:12}}>
               <Badge col={C.gold}>{courseData.category}</Badge>
               <Badge col="rgba(255,255,255,.45)">{courseData.level}</Badge>
@@ -3016,8 +3501,10 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
                       <button
                         key={key}
                         type="button"
-                        disabled={enrolled}
-                        onClick={() => setTrackKey(key)}
+                        onClick={() => {
+                          setTrackKey(key);
+                          if (enrolled) DB.enroll(courseData.id, { trackKey: key });
+                        }}
                         style={{
                           width:"100%",
                           textAlign:"left",
@@ -3025,13 +3512,13 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
                           borderRadius:10,
                           border:`1px solid ${active ? C.em : C.border}`,
                           background:active ? `${C.em}0D` : C.cream,
-                          cursor:enrolled ? "default" : "pointer",
-                          opacity:enrolled && !active ? 0.7 : 1,
+                          cursor:"pointer",
+                          opacity:1,
                         }}
                       >
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:3}}>
                           <span style={{fontWeight:700,color:active ? C.emD : C.text}}>{track.label}</span>
-                          {active&&<span style={{fontSize:".68rem",fontWeight:700,color:C.gold}}>{enrolled ? "Enrolled" : "Selected"}</span>}
+                          {active&&<span style={{fontSize:".68rem",fontWeight:700,color:C.gold}}>{enrolled ? "Active" : "Selected"}</span>}
                         </div>
                         <div style={{fontSize:".72rem",color:C.textL,lineHeight:1.5}}>{track.note}</div>
                       </button>
@@ -3040,7 +3527,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
                 </div>
                 <div style={{marginTop:8,fontSize:".69rem",lineHeight:1.55,color:C.textL}}>
                   {enrolled
-                    ? `You are enrolled in the ${courseData.selectedTrackLabel} option for this course.`
+                    ? `You are enrolled in this course. Switching options updates the active study path to ${courseData.selectedTrackLabel}.`
                     : "Choose which option the learner should follow before enrolling in this course."}
                 </div>
               </div>
@@ -3052,7 +3539,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
             ) : (
               <div>
                 {popped&&<div style={{textAlign:"center",fontSize:"1.3rem",marginBottom:7,animation:"pop .4s ease"}}>🎉 Enrolled!</div>}
-                <Btn v="primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{setLesson({course:courseData,mi:0,li:0});setPage("lesson");}}>
+                <Btn v="primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{ if (!nextLesson) return; setLesson({course:courseData,mi:nextLesson.mi,li:nextLesson.li});setPage("lesson"); }}>
                   ▶ Resume Course
                 </Btn>
                 <div style={{marginTop:9}}><PBar value={pct} label={`${pct}% complete`}/></div>
@@ -3087,7 +3574,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
               <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.28rem",color:C.emD}}>{courseData.modules.length} Modules · {tot} Lessons</h2>
               {enrolled&&<Badge col={C.em}>{pct}% Complete</Badge>}
             </div>
-            <ModuleList course={courseData} doneIds={doneIds} isEnrolled={enrolled} onLesson={handleLesson} curId={curId}/>
+            <ModuleList course={courseData} doneIds={completedIds} isEnrolled={enrolled} onLesson={handleLesson} curId={curId}/>
           </div>
         )}
         {tab==="instructor"&&(
@@ -3141,6 +3628,8 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
   const [watchInfo, setWatchInfo] = useState(sourceCourse ? DB.watch(sourceCourse.id, sourceCourse.modules[initMi||0]?.lessons[initLi||0]?.id) : defaultWatchState());
   const [trackingSupported, setTrackingSupported] = useState(Boolean(getYtId(sourceCourse?.modules[initMi||0]?.lessons[initLi||0]?.youtubeId)));
   const [courseCompleted, setCourseCompleted] = useState(null);
+  const [certificateGate, setCertificateGate] = useState(null);
+  const [gateDismissed, setGateDismissed] = useState(false);
   const completeTimer = useRef(null);
   const completionTriggered = useRef(false);
   const course = sourceCourse;
@@ -3151,12 +3640,15 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
   const curMod  = course.modules[mi];
   const curLs   = curMod?.lessons[li];
   const flatIdx = flat.findIndex(l=>l.id===curLs?.id);
-  const tot     = flat.length;
-  const dn      = doneIds.length;
-  const pct     = tot>0 ? Math.round(dn/tot*100) : 0;
+  const progress = courseProgressStats(course, doneIds);
+  const tot     = progress.total;
+  const dn      = progress.completed;
+  const pct     = progress.pct;
   const isDone  = doneIds.includes(curLs?.id);
   const hasTrackableVideo = Boolean(getYtId(curLs?.youtubeId));
-  const lessonWatchPct = isDone ? 100 : Math.max(0, watchInfo.percent || 0);
+  const lessonWatchPct = Math.max(0, watchInfo.percent || 0);
+  const watchStats = courseWatchStats(course);
+  const certificateReady = Boolean(DB.courseCompletion(course.id));
 
   useEffect(() => {
     if (!course || !curLs) return;
@@ -3171,6 +3663,8 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
 
   useEffect(() => {
     setCourseCompleted(null);
+    setCertificateGate(null);
+    setGateDismissed(false);
   }, [course?.id]);
 
   useEffect(() => () => clearTimeout(completeTimer.current), []);
@@ -3178,6 +3672,53 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
   const goTo = (newMi, newLi) => { setMi(newMi); setLi(newLi); setConfetti(false); };
   const goPrev = () => { if(flatIdx>0){ const p=flat[flatIdx-1]; goTo(p.mi,p.li); } };
   const goNext = () => { if(flatIdx<tot-1){ const n=flat[flatIdx+1]; goTo(n.mi,n.li); } };
+  const maybeIssueCertificate = useCallback((progressIds=DB.progress(course.id)) => {
+    if (!course) return null;
+    const hasFinishedCourse = courseDoneIds(course, progressIds).length === tot;
+    if (!hasFinishedCourse) {
+      setCertificateGate(null);
+      setGateDismissed(false);
+      return null;
+    }
+    if (DB.courseCompletion(course.id)) {
+      setCertificateGate(null);
+      setGateDismissed(false);
+      return null;
+    }
+
+    const nextWatchStats = courseWatchStats(course);
+    if (!nextWatchStats.eligible) {
+      setCertificateGate(nextWatchStats);
+      return null;
+    }
+
+    setCertificateGate(null);
+    setGateDismissed(false);
+    return DB.finishCourse(course.id, { watchPercent: nextWatchStats.averagePct });
+  }, [course, tot]);
+  const markLessonComplete = useCallback((lesson) => {
+    if (!course || !lesson) return;
+    const currentProgress = DB.progress(course.id);
+    if (currentProgress.includes(lesson.id)) return;
+
+    DB.complete(course.id, lesson.id, {
+      watchedSeconds: DB.watch(course.id, lesson.id).watchedSeconds,
+      duration: DB.watch(course.id, lesson.id).duration,
+      source: getYtId(lesson.youtubeId) ? "manual-fallback" : "manual",
+    });
+    DB.touch();
+
+    const updated = DB.progress(course.id);
+    setDoneIds(updated);
+
+    if (lesson.id === curLs?.id) {
+      completionTriggered.current = true;
+      setWatchInfo(DB.watch(course.id, lesson.id));
+    }
+
+    const completion = maybeIssueCertificate(updated);
+    if (completion) setCourseCompleted(completion);
+  }, [course, curLs?.id, maybeIssueCertificate]);
 
   const completeLesson = useCallback((source="manual", payload={}) => {
     if (!course || !curLs || completionTriggered.current) return;
@@ -3185,7 +3726,6 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
     completionTriggered.current = true;
     DB.complete(course.id, curLs.id, {
       ...payload,
-      percent: payload.percent ?? 100,
       source,
     });
     DB.touch();
@@ -3193,11 +3733,9 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
     const updated = DB.progress(course.id);
     setDoneIds(updated);
     setWatchInfo(DB.watch(course.id, curLs.id));
-    const hasFinishedCourse = updated.length === tot;
-
-    if (hasFinishedCourse) {
-      setCourseCompleted(DB.finishCourse(course.id));
-    }
+    const hasFinishedCourse = courseDoneIds(course, updated).length === tot;
+    const completion = maybeIssueCertificate(updated);
+    if (completion) setCourseCompleted(completion);
 
     setConfetti(true);
     clearTimeout(completeTimer.current);
@@ -3208,7 +3746,7 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
         goTo(nextLesson.mi, nextLesson.li);
       }
     }, 1600);
-  }, [course, curLs, flatIdx, tot]);
+  }, [course, curLs, flatIdx, maybeIssueCertificate, tot]);
 
   const handleWatchProgress = useCallback((payload) => {
     if (!course || !curLs) return;
@@ -3224,15 +3762,14 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
     if (nextWatch.percent >= WATCH_COMPLETE_THRESHOLD && !completionTriggered.current) {
       completeLesson("watch", nextWatch);
     }
-  }, [completeLesson, course, curLs]);
+
+    const completion = maybeIssueCertificate();
+    if (completion) setCourseCompleted(completion);
+  }, [completeLesson, course, curLs, maybeIssueCertificate]);
 
   const markDone = () => {
     if (isDone) return;
-    completeLesson(hasTrackableVideo ? "manual-fallback" : "manual", {
-      percent: 100,
-      watchedSeconds: watchInfo.watchedSeconds,
-      duration: watchInfo.duration,
-    });
+    completeLesson(hasTrackableVideo ? "manual-fallback" : "manual", {});
   };
 
   return (
@@ -3274,7 +3811,31 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
           {/* Lesson info */}
           <div style={{padding:"18px 22px",background:"#151515",borderTop:"1px solid rgba(255,255,255,.04)"}}>
             <div style={{fontSize:".68rem",color:"rgba(255,255,255,.3)",marginBottom:6}}>{curMod?.title} · Lesson {li+1} of {curMod?.lessons.length}</div>
-            <h2 style={{fontFamily:"'Crimson Pro',serif",color:"white",fontSize:"1.18rem",marginBottom:7}}>{curLs?.title}</h2>
+            <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start",marginBottom:7}}>
+              <h2 style={{fontFamily:"'Crimson Pro',serif",color:"white",fontSize:"1.18rem",marginBottom:0,flex:1}}>{curLs?.title}</h2>
+              <button
+                type="button"
+                onClick={markDone}
+                disabled={isDone}
+                aria-label={isDone ? "Lecture completed" : "Mark lecture complete"}
+                title={isDone ? "Lecture completed" : "Mark lecture complete"}
+                style={{
+                  width:28,
+                  height:28,
+                  borderRadius:8,
+                  border:`1px solid ${isDone ? C.em : "rgba(255,255,255,.22)"}`,
+                  background:isDone ? C.em : "transparent",
+                  color:isDone ? "white" : "rgba(255,255,255,.72)",
+                  display:"inline-flex",
+                  alignItems:"center",
+                  justifyContent:"center",
+                  cursor:isDone ? "default" : "pointer",
+                  flexShrink:0,
+                }}
+              >
+                {isDone ? "✓" : ""}
+              </button>
+            </div>
             {curLs?.description&&<p style={{color:"rgba(255,255,255,.46)",fontSize:".8rem",lineHeight:1.6,marginBottom:12}}>{curLs.description}</p>}
             {hasTrackableVideo ? (
               <div style={{marginBottom:12,padding:"10px 12px",borderRadius:10,background:"rgba(201,168,76,.08)",border:`1px solid ${C.gold}28`}}>
@@ -3290,12 +3851,20 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
                     ? `This lesson auto-completes once the learner has watched ${WATCH_COMPLETE_THRESHOLD}% of the video.`
                     : "YouTube tracking is unavailable on this device right now, so a manual completion fallback is shown below."}
                 </div>
+                <div style={{marginTop:7,fontSize:".7rem",color:"rgba(255,255,255,.48)"}}>
+                  Certificate unlock: {watchStats.averagePct}% total watch time. At least {CERTIFICATE_WATCH_THRESHOLD}% is required.
+                </div>
               </div>
             ) : (
               <div style={{marginBottom:12,padding:"10px 12px",borderRadius:10,background:"rgba(11,82,64,.18)",border:`1px solid ${C.em}38`,fontSize:".72rem",color:"rgba(255,255,255,.58)"}}>
                 {curLs?.youtubeId === "DEMO"
                   ? "This lesson is still using a placeholder video ID, so completion stays manual until a real YouTube lesson is added."
                   : "This lesson is not currently available for in-site playback, so manual completion is shown instead."}
+              </div>
+            )}
+            {!certificateReady && certificateGate && (
+              <div style={{marginBottom:12,padding:"11px 12px",borderRadius:10,background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.28)",fontSize:".74rem",color:"rgba(255,255,255,.76)",lineHeight:1.65}}>
+                All lectures are marked complete, but the certificate is still locked until the learner reaches at least {CERTIFICATE_WATCH_THRESHOLD}% total watch time. Current watch time: <strong style={{color:"white"}}>{certificateGate.averagePct}%</strong>.
               </div>
             )}
             <div className="lesson-actions" style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap"}}>
@@ -3390,6 +3959,33 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
                               {!isDn&&watchPct>0?` · ${watchPct}% watched`:""}
                             </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (isDn) return;
+                              if (isCur) markDone();
+                              else markLessonComplete(ls);
+                            }}
+                            aria-label={isDn ? "Lecture completed" : `Mark ${ls.title} complete`}
+                            title={isDn ? "Lecture completed" : "Mark lecture complete"}
+                            style={{
+                              width:18,
+                              height:18,
+                              borderRadius:5,
+                              border:`1px solid ${isDn ? C.em : "rgba(255,255,255,.22)"}`,
+                              background:isDn ? C.em : "transparent",
+                              color:isDn ? "white" : "transparent",
+                              fontSize:".66rem",
+                              display:"inline-flex",
+                              alignItems:"center",
+                              justifyContent:"center",
+                              flexShrink:0,
+                              cursor:isDn ? "default" : "pointer",
+                            }}
+                          >
+                            ✓
+                          </button>
                         </div>
                       );
                     })}
@@ -3457,6 +4053,32 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
           </div>
         </div>
       )}
+
+      {certificateGate && !courseCompleted && !gateDismissed && (
+        <div className="overlay" style={{padding:"20px"}}>
+          <div style={{width:"min(620px,100%)",background:"white",borderRadius:22,padding:"22px",boxShadow:"0 28px 80px rgba(0,0,0,.28)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start",marginBottom:14}}>
+              <div>
+                <div style={{fontFamily:"'Amiri',serif",fontSize:"1.6rem",color:C.emD,marginBottom:4}}>Certificate Almost Ready</div>
+                <div style={{fontSize:".88rem",color:C.textL,lineHeight:1.7}}>
+                  The learner has completed every lecture, but certificates unlock only after at least {CERTIFICATE_WATCH_THRESHOLD}% total watch time.
+                </div>
+              </div>
+              <button onClick={()=>setGateDismissed(true)} style={{background:"transparent",border:"none",fontSize:"1.4rem",cursor:"pointer",color:C.textL,lineHeight:1}}>×</button>
+            </div>
+            <div style={{padding:"12px 14px",borderRadius:12,background:C.cream,border:`1px solid ${C.border}`,marginBottom:16}}>
+              <div style={{fontWeight:700,color:C.emD,marginBottom:5}}>Current course watch time: {certificateGate.averagePct}%</div>
+              <div style={{fontSize:".8rem",color:C.textL,lineHeight:1.65}}>
+                Keep watching lessons on the website until the learner reaches the certificate threshold. Manual checkboxes can mark lessons complete, but they do not count as watch time.
+              </div>
+            </div>
+            <div className="action-row" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              <Btn v="primary" onClick={()=>setGateDismissed(true)}>Continue Watching</Btn>
+              <Btn v="outline" onClick={() => { setGateDismissed(true); setPage("dashboard"); }}>Back to Dashboard</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -3506,14 +4128,11 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
 
   if (!currentUser) return null;
 
-  const totalDone  = Object.values(allProg).reduce((a,arr)=>a+arr.length, 0);
+  const totalDone  = courses.reduce((sum, enrolledCourse) => sum + courseProgressStats(enrolledCourse).completed, 0);
   const notesCount = Object.values(notes).filter(n=>n.trim()).length;
   const initials   = getInitials(currentUser.name);
   const firstName  = currentUser.name.split(" ")[0] || "Student";
-  const completedCourses = courses.filter(c => {
-    const total = totalLessons(c);
-    return total > 0 && DB.progress(c.id).length === total;
-  });
+  const completedCourses = courses.filter(c => Boolean(completions[String(c.id)]));
 
   const sideItems = [
     {icon:"📊",l:"Overview",k:"overview"},
@@ -3612,9 +4231,10 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
             ) : (
                 <div className="grid-2 dashboard-highlight-grid" style={{gridTemplateColumns:"1fr 1fr",gap:13}}>
                 {courses.slice(0,4).map(c=>{
-                  const tot = totalLessons(c);
-                  const dn  = DB.progress(c.id).length;
-                  const pct = tot>0?Math.round(dn/tot*100):0;
+                  const stats = courseProgressStats(c);
+                  const tot = stats.total;
+                  const dn  = stats.completed;
+                  const pct = stats.pct;
                   return (
                     <div key={c.id} style={{background:"white",borderRadius:12,padding:16,border:`1px solid ${C.border}`,cursor:"pointer",transition:"box-shadow .2s"}}
                       onClick={()=>openLesson(c)}
@@ -3648,9 +4268,10 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
             ) : (
               <div style={{display:"grid",gap:13}}>
                 {courses.map(c=>{
-                  const tot = totalLessons(c);
-                  const dn  = DB.progress(c.id).length;
-                  const pct = tot>0?Math.round(dn/tot*100):0;
+                  const stats = courseProgressStats(c);
+                  const tot = stats.total;
+                  const dn  = stats.completed;
+                  const pct = stats.pct;
                   return (
                     <div key={c.id} style={{background:"white",borderRadius:12,overflow:"hidden",border:`1px solid ${C.border}`}}>
                       <div style={{height:68,background:`linear-gradient(135deg,${c.color},${c.color}80)`,display:"flex",alignItems:"center",padding:"0 18px",gap:13,position:"relative"}}>
@@ -3766,7 +4387,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
               <div style={{background:"white",borderRadius:12,padding:32,textAlign:"center",border:`1px solid ${C.border}`}}>
                 <div style={{fontSize:"2.3rem",marginBottom:11}}>🏆</div>
                 <div style={{fontWeight:600,marginBottom:5}}>No certificates yet</div>
-                <div style={{fontSize:".8rem",color:C.textL}}>Complete every lesson in a course to unlock a printable certificate.</div>
+                <div style={{fontSize:".8rem",color:C.textL}}>Finish the lessons and reach at least {CERTIFICATE_WATCH_THRESHOLD}% watch time in a course to unlock a printable certificate.</div>
               </div>
             ) : (
               <>
@@ -3847,7 +4468,10 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 const LoginPage = ({ setPage, onLogin }) => {
-  const [form, setForm] = useState({ email:"", password:"" });
+  const rememberedEmail = ls.get(K.LOGIN_EMAIL, "") || "";
+  const [form, setForm] = useState({ email:rememberedEmail, password:"" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberEmail, setRememberEmail] = useState(Boolean(rememberedEmail));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -3862,6 +4486,8 @@ const LoginPage = ({ setPage, onLogin }) => {
     setNotice("");
     try {
       const user = await Auth.login(form);
+      if (rememberEmail) ls.set(K.LOGIN_EMAIL, user.email);
+      else ls.remove(K.LOGIN_EMAIL);
       await wait(250);
       onLogin(user);
       setPage(user.role==="admin" ? "admin" : "dashboard");
@@ -3912,34 +4538,79 @@ const LoginPage = ({ setPage, onLogin }) => {
   return (
     <div className="page" style={{paddingTop:64,minHeight:"100vh",background:`linear-gradient(160deg,${C.emD},${C.em})`,display:"flex",alignItems:"center",justifyContent:"center",padding:"64px 20px 36px",position:"relative"}}>
       <Iso op={0.06} col={C.gold}/>
-      <div className="auth-card" style={{background:"white",borderRadius:20,padding:38,maxWidth:410,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
+      <div className="auth-card" style={{background:"white",borderRadius:20,padding:38,maxWidth:460,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
         <div style={{textAlign:"center",marginBottom:22}}>
           <div style={{width:46,height:46,borderRadius:11,background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 9px"}}>
             <svg width="23" height="23" viewBox="0 0 22 22"><polygon points="11,2 13,8 19,8 14,12 16,18 11,14 6,18 8,12 3,8 9,8" fill="white"/></svg>
           </div>
           <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.45rem",color:C.emD}}>Secure Sign In</h1>
           <p style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".88rem"}}>دخول آمن للمتعلمين والإدارة</p>
+          <div style={{marginTop:10,display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8}}>
+            {[
+              { label:"Student", text:"Courses, notes, progress" },
+              { label:"Admin", text:"Users, courses, certificates" },
+              { label:"Browser Sync", text:"Saved on this device" },
+            ].map(item => (
+              <div key={item.label} style={{padding:"9px 10px",borderRadius:10,background:C.cream,border:`1px solid ${C.border}`}}>
+                <div style={{fontSize:".66rem",fontWeight:800,color:C.emD,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>{item.label}</div>
+                <div style={{fontSize:".68rem",color:C.textL,lineHeight:1.45}}>{item.text}</div>
+              </div>
+            ))}
+          </div>
         </div>
         <Divider/>
         <form onSubmit={handleSubmit} autoComplete="on" style={{marginTop:18}}>
-          {[["Email","email","you@example.com","📧"],["Password","password","Enter your password","🔒"]].map(([label,type,placeholder,icon])=>(
-            <div key={label} style={{marginBottom:13}}>
-              <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
-              <div style={{position:"relative"}}>
-                <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}>{icon}</span>
-                <input
-                  type={type}
-                  name={type === "email" ? "email" : "password"}
-                  autoComplete={type === "email" ? "username" : "current-password"}
-                  autoCapitalize="none"
-                  value={form[type]}
-                  onChange={e=>setForm(prev => ({ ...prev, [type]: e.target.value }))}
-                  placeholder={placeholder}
-                  style={{width:"100%",padding:"10px 12px 10px 35px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".85rem",background:C.cream}}/>
-              </div>
+          <div style={{marginBottom:13}}>
+            <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Email</label>
+            <div style={{position:"relative"}}>
+              <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}>📧</span>
+              <input
+                type="email"
+                name="email"
+                autoComplete="username"
+                autoCapitalize="none"
+                value={form.email}
+                onChange={e=>setForm(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="you@example.com"
+                style={{width:"100%",padding:"10px 12px 10px 35px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".85rem",background:C.cream}}
+              />
             </div>
-          ))}
-          <div style={{display:"flex",justifyContent:"flex-end",marginTop:-2,marginBottom:12}}>
+          </div>
+          <div style={{marginBottom:13}}>
+            <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Password</label>
+            <div style={{position:"relative"}}>
+              <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}>🔒</span>
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                autoComplete="current-password"
+                value={form.password}
+                onChange={e=>setForm(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="Enter your password"
+                style={{width:"100%",padding:"10px 82px 10px 35px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".85rem",background:C.cream}}
+              />
+              <button
+                type="button"
+                onClick={()=>setShowPassword(open => !open)}
+                style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",border:"none",background:"none",color:C.em,fontWeight:700,fontSize:".72rem",cursor:"pointer"}}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginTop:-2,marginBottom:12,flexWrap:"wrap"}}>
+            <label style={{display:"inline-flex",alignItems:"center",gap:8,fontSize:".75rem",color:C.textM,cursor:"pointer"}}>
+              <input
+                type="checkbox"
+                checked={rememberEmail}
+                onChange={e => {
+                  const nextValue = e.target.checked;
+                  setRememberEmail(nextValue);
+                  if (!nextValue) ls.remove(K.LOGIN_EMAIL);
+                }}
+              />
+              Remember email
+            </label>
             <button
               type="button"
               onClick={toggleForgot}
@@ -4012,9 +4683,9 @@ const LoginPage = ({ setPage, onLogin }) => {
             Need learner access? <span onClick={()=>setPage("register")} style={{color:C.em,fontWeight:600,cursor:"pointer"}}>Create Account</span>
           </p>
           <div style={{marginTop:11,padding:"10px 12px",background:`${C.gold}0E`,borderRadius:8,border:`1px solid ${C.gold}22`}}>
-            <div style={{fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:5}}>Private role-based access</div>
+            <div style={{fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:5}}>LMS-style role-based access</div>
             <div style={{fontSize:".72rem",color:C.textM,lineHeight:1.65}}>
-              Administrators sign in with assigned credentials. Learners can create an account to access their dashboard, progress, notes, and certificates.
+              Administrators sign in with academy credentials and get access to user management, course management, and certificate records. Learners can create an account to access their dashboard, progress, notes, and certificates.
             </div>
             <div style={{fontSize:".68rem",color:C.textL,marginTop:6}}>Access data is currently stored in this browser until your hosted backend is connected.</div>
           </div>
@@ -4153,48 +4824,174 @@ const AboutPage = () => (
 
 // ─── CONTACT ──────────────────────────────────────────────────────────────────
 const ContactPage = () => {
-  const [sent, setSent] = useState(false);
+  const contactEmail = "mohdashfaq1416@gmail.com";
+  const contactPhone = "+91 7006370956";
+  const whatsappNumber = "917006370956";
+  const quickTopics = ["New course request", "Certificate help", "Login issue", "General support"];
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    subject: "Course request for Nur Academy",
+    message: "",
+  });
+
+  const suggestionPrompt = "Please write an email or send a message on WhatsApp if you think there should be a course from YouTube on this website.";
+  const updateForm = (key, value) => setForm(current => ({ ...current, [key]: value }));
+  const buildDraft = () => {
+    const subject = form.subject.trim() || "Course request for Nur Academy";
+    const body = [
+      `Name: ${form.name.trim() || "Not provided"}`,
+      `Email: ${form.email.trim() || "Not provided"}`,
+      "",
+      form.message.trim() || suggestionPrompt,
+      "",
+      "Please let me know if this course or request can be added to Nur Academy.",
+    ].join("\n");
+
+    return { subject, body };
+  };
+
+  const openEmailDraft = () => {
+    const { subject, body } = buildDraft();
+    window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const openWhatsAppDraft = () => {
+    const { subject, body } = buildDraft();
+    const text = `${subject}\n\n${body}`;
+    window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="page" style={{paddingTop:64}}>
-      <div style={{background:`linear-gradient(160deg,${C.emD},${C.em})`,padding:"50px 5%",textAlign:"center",position:"relative",overflow:"hidden"}}>
-        <Iso op={0.07} col={C.gold}/>
-        <h1 style={{fontFamily:"'Amiri',serif",fontSize:"2rem",color:"white",position:"relative",zIndex:1}}>Contact Us</h1>
-        <p style={{fontFamily:"'Amiri',serif",color:C.gold,position:"relative",zIndex:1}}>تواصل معنا</p>
-      </div>
-      <div className="split-grid" style={{padding:"48px 5%",background:C.cream,maxWidth:950,margin:"0 auto",gridTemplateColumns:"1fr 1fr",gap:44}}>
-        <div>
-          <h2 style={{fontFamily:"'Amiri',serif",fontSize:"1.6rem",color:C.emD,marginBottom:18}}>Get In Touch</h2>
-          {[{icon:"📧",l:"Email",v:"info@nuracademy.com"},{icon:"💬",l:"WhatsApp",v:"+1 (555) 123-4567"},{icon:"🌍",l:"Community",v:"discord.gg/nuracademy"}].map((c,i)=>(
-            <div key={i} style={{display:"flex",gap:12,marginBottom:13,padding:13,background:"white",borderRadius:10,border:`1px solid ${C.border}`}}>
-              <span style={{fontSize:"1.3rem"}}>{c.icon}</span>
-              <div><div style={{fontWeight:700,fontSize:".76rem",color:C.textM,textTransform:"uppercase",letterSpacing:".05em",marginBottom:2}}>{c.l}</div><div style={{color:C.em,fontSize:".83rem"}}>{c.v}</div></div>
+      <div style={{background:`radial-gradient(circle at top right, rgba(201,168,76,.22), transparent 34%), linear-gradient(160deg,${C.emD},${C.em})`,padding:"58px 5% 48px",position:"relative",overflow:"hidden"}}>
+        <Iso op={0.08} col={C.gold}/>
+        <div className="split-grid" style={{maxWidth:1180,margin:"0 auto",gridTemplateColumns:"1.1fr .9fr",gap:34,alignItems:"center",position:"relative",zIndex:1}}>
+          <div>
+            <Badge col={C.gold}>Support • Course Requests • WhatsApp</Badge>
+            <h1 style={{fontFamily:"'Amiri',serif",fontSize:"clamp(2rem,4vw,2.9rem)",color:"white",margin:"14px 0 6px"}}>Contact Nur Academy</h1>
+            <p style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:"1rem",marginBottom:16}}>تواصل معنا</p>
+            <p style={{color:"rgba(255,255,255,.78)",lineHeight:1.8,maxWidth:620,fontSize:".95rem",marginBottom:18}}>
+              Need help with a course, login, certificate, or study path? Reach out directly and we will review it, in sha Allah. If you think a valuable YouTube course should be added to the academy, send the request here.
+            </p>
+            <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}>
+              <Btn v="gold" onClick={openEmailDraft}>Write Email</Btn>
+              <Btn v="dark" onClick={openWhatsAppDraft}>Message on WhatsApp</Btn>
             </div>
-          ))}
-        </div>
-        <div style={{background:"white",borderRadius:16,padding:28,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
-          {!sent ? (
-            <>
-              <h3 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.18rem",color:C.emD,marginBottom:17}}>Send a Message</h3>
-              {[["Name","text","Ahmad Al-Farsi"],["Email","email","ahmad@email.com"],["Subject","text","Course inquiry"]].map(([l,t,ph])=>(
-                <div key={l} style={{marginBottom:12}}>
-                  <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{l}</label>
-                  <input type={t} placeholder={ph} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".83rem"}}/>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,maxWidth:720}}>
+              {[
+                { label:"Support Email", value:contactEmail },
+                { label:"WhatsApp", value:contactPhone },
+                { label:"Best For", value:"Course requests, login help, certificates" },
+              ].map(item => (
+                <div key={item.label} style={{padding:"14px 16px",borderRadius:14,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",backdropFilter:"blur(8px)"}}>
+                  <div style={{fontSize:".67rem",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:"rgba(255,255,255,.56)",marginBottom:5}}>{item.label}</div>
+                  <div style={{fontSize:".88rem",lineHeight:1.55,color:"white"}}>{item.value}</div>
                 </div>
               ))}
-              <div style={{marginBottom:16}}>
-                <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Message</label>
-                <textarea rows={4} placeholder="How can we help?" style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".83rem",resize:"vertical"}}/>
-              </div>
-              <Btn v="primary" style={{width:"100%",justifyContent:"center"}} onClick={()=>setSent(true)}>📨 Send Message</Btn>
-            </>
-          ) : (
-            <div style={{textAlign:"center",padding:"30px 0"}}>
-              <div style={{fontSize:"2.6rem",marginBottom:11}}>✅</div>
-              <h3 style={{fontFamily:"'Amiri',serif",fontSize:"1.28rem",color:C.em,marginBottom:5}}>JazakAllahu Khayran!</h3>
-              <p style={{color:C.textM,fontSize:".84rem"}}>We'll respond within 24 hours, in sha Allah.</p>
-              <Btn v="outline" style={{marginTop:15}} onClick={()=>setSent(false)}>Send Another</Btn>
             </div>
-          )}
+          </div>
+          <div style={{background:"rgba(255,255,255,.08)",borderRadius:24,padding:22,border:"1px solid rgba(255,255,255,.12)",boxShadow:"0 24px 60px rgba(0,0,0,.18)",backdropFilter:"blur(10px)"}}>
+            <div style={{fontSize:".72rem",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:C.gold,marginBottom:8}}>Course Suggestion Notice</div>
+            <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.38rem",fontWeight:700,color:"white",marginBottom:8}}>Request a YouTube course for the website</div>
+            <p style={{color:"rgba(255,255,255,.78)",fontSize:".88rem",lineHeight:1.75,marginBottom:14}}>
+              {suggestionPrompt}
+            </p>
+            <div style={{padding:"14px 16px",borderRadius:16,background:"rgba(201,168,76,.12)",border:"1px solid rgba(201,168,76,.28)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <span style={{fontSize:"1.2rem"}}>📩</span>
+                <a href={`mailto:${contactEmail}`} style={{color:"white",fontWeight:700,textDecoration:"none"}}>{contactEmail}</a>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:"1.2rem"}}>💬</span>
+                <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noreferrer" style={{color:"white",fontWeight:700,textDecoration:"none"}}>{contactPhone}</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="split-grid" style={{padding:"48px 5% 64px",background:C.cream,maxWidth:1180,margin:"0 auto",gridTemplateColumns:"1fr 1fr",gap:32}}>
+        <div style={{display:"grid",gap:16}}>
+          <div style={{background:"white",borderRadius:20,padding:24,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:14}}>
+              <div>
+                <div style={{fontSize:".72rem",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:5}}>Ways to Reach Us</div>
+                <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.5rem",color:C.emD}}>Choose the easiest support route</h2>
+              </div>
+              <div style={{width:52,height:52,borderRadius:16,background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:"1.4rem",flexShrink:0}}>✉️</div>
+            </div>
+            {[
+              { icon:"📧", label:"Email", value:contactEmail, note:"Best for detailed course requests and website support.", href:`mailto:${contactEmail}` },
+              { icon:"💬", label:"WhatsApp", value:contactPhone, note:"Best for quick messages and follow-up questions.", href:`https://wa.me/${whatsappNumber}` },
+            ].map(item => (
+              <a key={item.label} href={item.href} target={item.href.startsWith("http") ? "_blank" : undefined} rel={item.href.startsWith("http") ? "noreferrer" : undefined}
+                style={{display:"flex",gap:14,padding:"15px 16px",borderRadius:14,background:C.cream,border:`1px solid ${C.border}`,textDecoration:"none",marginBottom:12}}>
+                <div style={{width:42,height:42,borderRadius:12,background:`${C.em}12`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",flexShrink:0}}>{item.icon}</div>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:".68rem",fontWeight:700,color:C.textL,letterSpacing:".08em",textTransform:"uppercase",marginBottom:3}}>{item.label}</div>
+                  <div style={{color:C.emD,fontWeight:700,marginBottom:4,wordBreak:"break-word"}}>{item.value}</div>
+                  <div style={{fontSize:".78rem",lineHeight:1.6,color:C.textM}}>{item.note}</div>
+                </div>
+              </a>
+            ))}
+          </div>
+          <div style={{background:`linear-gradient(180deg, white, ${C.gold}08)`,borderRadius:20,padding:24,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+            <div style={{fontSize:".72rem",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>What You Can Send</div>
+            <h3 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.34rem",color:C.emD,marginBottom:12}}>Helpful reasons to contact the academy</h3>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
+              {quickTopics.map(topic => (
+                <button
+                  key={topic}
+                  type="button"
+                  onClick={() => updateForm("subject", topic)}
+                  style={{padding:"8px 12px",borderRadius:999,border:`1px solid ${C.border}`,background:"white",color:C.emD,fontSize:".77rem",fontWeight:700,cursor:"pointer"}}
+                >
+                  {topic}
+                </button>
+              ))}
+            </div>
+            <p style={{fontSize:".83rem",lineHeight:1.7,color:C.textM}}>
+              Please include the course name or YouTube playlist link when possible. That makes it much easier to review your request and add the right content to Nur Academy.
+            </p>
+          </div>
+        </div>
+        <div style={{background:"white",borderRadius:20,padding:26,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+          <div style={{fontSize:".72rem",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>Write to Us</div>
+          <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.46rem",color:C.emD,marginBottom:10}}>Send your request in one step</h2>
+          <p style={{fontSize:".83rem",color:C.textM,lineHeight:1.7,marginBottom:18}}>
+            Fill this in and then choose email or WhatsApp. The message will open with your details already prepared.
+          </p>
+          {[["Name", "name", "text", "Your name"], ["Email", "email", "email", "your@email.com"], ["Subject", "subject", "text", "Course request for Nur Academy"]].map(([label, key, type, placeholder]) => (
+            <div key={key} style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:".69rem",fontWeight:700,color:C.textL,letterSpacing:".08em",textTransform:"uppercase",marginBottom:6}}>{label}</label>
+              <input
+                type={type}
+                value={form[key]}
+                onChange={event => updateForm(key, event.target.value)}
+                placeholder={placeholder}
+                style={{width:"100%",padding:"12px 14px",borderRadius:12,border:`1px solid ${C.border}`,background:C.cream,fontSize:".86rem",outline:"none"}}
+              />
+            </div>
+          ))}
+          <div style={{marginBottom:18}}>
+            <label style={{display:"block",fontSize:".69rem",fontWeight:700,color:C.textL,letterSpacing:".08em",textTransform:"uppercase",marginBottom:6}}>Message</label>
+            <textarea
+              rows={7}
+              value={form.message}
+              onChange={event => updateForm("message", event.target.value)}
+              placeholder="Please write an email or send a message on WhatsApp if you think there should be a course from YouTube on this website."
+              style={{width:"100%",padding:"12px 14px",borderRadius:12,border:`1px solid ${C.border}`,background:C.cream,fontSize:".86rem",resize:"vertical",lineHeight:1.7,outline:"none"}}
+            />
+          </div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:14}}>
+            <Btn v="primary" style={{flex:"1 1 220px",justifyContent:"center"}} onClick={openEmailDraft}>Write Email</Btn>
+            <Btn v="gold" style={{flex:"1 1 220px",justifyContent:"center"}} onClick={openWhatsAppDraft}>Send on WhatsApp</Btn>
+          </div>
+          <div style={{padding:"12px 14px",borderRadius:14,background:`${C.em}08`,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:".77rem",lineHeight:1.7,color:C.textM}}>
+              We currently respond through email and WhatsApp, so these two buttons are the fastest way to reach us directly.
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -4469,7 +5266,7 @@ const AdminPage = ({ setPage, currentUser }) => {
                   <thead><tr>{["User","Role","Joined","Status","Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {users.map(user=>{
-                      const protectedAccount = user.id === "nur_admin_primary" || user.id === currentUser.id;
+                      const protectedAccount = isPrimaryAdminUser(user) || user.id === currentUser.id;
                       return (
                         <tr key={user.id}>
                           <td>

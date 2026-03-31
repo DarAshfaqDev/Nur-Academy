@@ -1,44 +1,83 @@
 # Nur Academy
 
-Nur Academy is a React + Vite Islamic learning website built to host YouTube-based courses with module-based lessons, watch progress, streak tracking, course completion, and printable certificates.
+Nur Academy is a thoughtfully designed Islamic learning platform built with React and Vite. It brings structured, YouTube-powered courses into a focused LMS-style experience with enrollment, progress tracking, notes, certificates, admin controls, and a clean learning flow for students.
 
-This project is designed to work well in two stages:
+The project is currently frontend-first and works fully in the browser, which makes it easy to launch, test, and iterate without waiting for a backend. At the same time, the structure is strong enough to grow into a full production LMS later.
 
-1. Initial static hosting on GitHub Pages
-2. Later migration to Railway with a real backend and database
+## Why This Project Exists
 
-At the moment, the app is fully usable as a frontend-first product. User accounts, notes, progress, streaks, and certificates are stored in the browser so you can launch quickly without a backend.
+A lot of valuable Islamic content already exists on YouTube, but it is often difficult to study in an organized way. Nur Academy turns those playlists into course journeys with modules, lesson progression, watch tracking, completion rules, and a more intentional student experience.
 
-## What This Project Does
+The goal is simple: make beneficial knowledge easier to access, easier to follow, and more respectful of how people actually learn.
 
-- Hosts Islamic courses using YouTube videos
-- Organizes lessons into modules and course pages
-- Tracks lesson completion and course percentage
-- Tracks daily learning streaks
-- Saves personal notes per lesson
-- Supports browser-local student login and registration
-- Restricts admin access to admin users only
-- Generates printable course completion certificates
-- Supports real YouTube watch tracking when embedding is allowed
-- Falls back to manual completion when a video cannot be tracked or embedded
+## Highlights
 
-## Current Real Playlist Courses
+- Structured Islamic courses built from real YouTube playlists
+- Course enrollment with remembered progress per user
+- Multi-track course support, including the Qaida course with three study paths
+- Lesson completion tracking with manual completion when needed
+- Real watch-time tracking when YouTube embedding allows it
+- Printable course certificates with a watch-time eligibility rule
+- Personal lesson notes saved automatically
+- Daily streak tracking
+- Admin tools for managing users and custom courses
+- Contact and course-request flow for suggesting new YouTube courses
+- Optional Hadiya support prompt after course completion
 
-The project currently includes real imported playlist data for:
+## Current Course Library
 
-- Mualim ul Quran
-- Noorani Qaida
-- Lisan ul Quran
+The current catalog includes courses across Quran, Arabic, Seerah, Hadith, Family, and Fiqh, including:
+
+- Tajweed-ul-Qira'at Course
 - Tajweed Course
+- Qaida Course with `Madani Qaida`, `Noorani Qaida`, and `Noorani Basics`
+- Mualim ul Quran
+- Lisan ul Quran
+- Arbi ka Muallim Book 1 to 4
+- Aasan Arabic Grammar
+- Ilm us Sarf
+- Ilm un Nahw
+- Short Seerah Course
+- Prophetic (SAW) Life
+- Prophetic Parenting
+- Usool e Hadith
+- Sahih Muslim
+- Islamic Basics
+- Insurance Rulings
 
-Other courses in the UI can still be used as starter templates until you replace their placeholder lessons with real YouTube content.
+Course content is sourced from imported YouTube playlists stored in [`src/data`](src/data), then transformed into modules inside [`src/App.jsx`](src/App.jsx).
+
+## How It Works
+
+### Learning Experience
+
+- Students can browse courses, enroll, and resume where they left off
+- Enrolled state is remembered in browser storage
+- Qaida supports multiple internal study tracks under one course card
+- Lessons can be marked complete manually with a square completion control
+- When available, YouTube watch progress is tracked inside the player
+
+### Certificates
+
+- Certificates unlock only after all lessons in a course are completed
+- Learners must also reach at least `75%` total watch time across the course
+- Certificates can be saved or printed as PDF
+
+### Admin Experience
+
+- A seeded primary admin account exists locally in the browser
+- The primary admin can manage users and custom courses from the in-app admin area
+- Admin features include user control, role management, blocking, and course management for admin-created content
+
+For security, this repository does not document a public plaintext admin password. On a local copy, use the seeded admin account configured in `src/App.jsx` and the in-app reset flow if you need to set a fresh password in your browser session.
 
 ## Tech Stack
 
 - React 18
 - Vite 5
-- Plain React state and browser `localStorage`
-- YouTube IFrame API for watch tracking
+- Browser `localStorage` for current data persistence
+- YouTube IFrame API for embedded playback and watch tracking
+- `html2canvas` and `jspdf` for certificate export
 
 ## Local Development
 
@@ -54,10 +93,10 @@ npm install
 npm run dev
 ```
 
-The app runs on:
+Vite will usually start the app at:
 
 ```txt
-http://localhost:3000
+http://localhost:5173
 ```
 
 ### 3. Build for production
@@ -72,177 +111,7 @@ npm run build
 npm run preview
 ```
 
-## Demo Accounts
-
-The app seeds demo accounts automatically in the browser on first load:
-
-- Student: `student@nuracademy.com` / `NurStudent123!`
-- Admin: `admin@nuracademy.com` / `NurAdmin123!`
-
-Important:
-
-- These accounts exist only inside the current browser
-- If browser storage is cleared, the demo data resets
-- This is intentional for GitHub Pages/static hosting
-
-## How Progress and Streaks Work
-
-- Each user has separate browser-local data
-- Lesson completion is stored per signed-in user
-- Course percentage is based on completed lessons
-- Streaks increase when the user completes at least one lesson in a day
-- Certificates unlock after all lessons in a course are completed
-
-For real YouTube videos:
-
-- The app uses the YouTube IFrame API
-- A lesson auto-completes after 90% watch progress
-
-Fallback behavior:
-
-- If a video cannot be embedded on external websites, the app shows an "Open on YouTube" option
-- If tracking is not available, the user can still use the manual `Mark Complete` button
-
-## Important YouTube Limitation
-
-Some YouTube videos or playlists cannot play inside websites because the video owner disables embedding.
-
-When that happens:
-
-- The app cannot force in-site playback
-- The user must open the video on YouTube
-- Manual completion remains available inside the app
-
-If you want full in-site playback and reliable watch tracking, use videos from a channel that allows embedding.
-
-## Adding a New YouTube Playlist
-
-There are two main ways to add courses:
-
-### Option 1. Replace a placeholder course
-
-This is the easiest approach and is how the current playlist-based courses were added.
-
-Steps:
-
-1. Create a playlist data file inside `src/data/`
-2. Export the playlist ID and lesson array
-3. Import that file into `src/App.jsx`
-4. Create a module builder for that playlist
-5. Replace one of the placeholder courses inside the `COURSES` array
-
-Example data file pattern:
-
-```js
-export const MY_PLAYLIST_ID = "PLxxxxxxxxxxxxxxxx";
-
-export const MY_PLAYLIST_ITEMS = [
-  { index: 1, youtubeId: "VIDEO_ID_1", duration: "12:34", sourceTitle: "Lesson 1" },
-  { index: 2, youtubeId: "VIDEO_ID_2", duration: "10:21", sourceTitle: "Lesson 2" },
-];
-```
-
-### Option 2. Manually add lesson IDs
-
-At the top of `src/App.jsx` there is a built-in guide showing how to replace lesson `youtubeId` values.
-
-You can use:
-
-- A raw YouTube video ID such as `dQw4w9WgXcQ`
-- Or a full YouTube URL
-
-Lessons with `youtubeId: "DEMO"` remain placeholders until real video IDs are added.
-
-## Project Structure
-
-```txt
-Nur Academy/
-├─ public/
-├─ src/
-│  ├─ data/
-│  │  ├─ tajweedCoursePlaylist.js
-│  │  ├─ mualimUlQuranPlaylist.js
-│  │  ├─ nooraniQaidaPlaylist.js
-│  │  └─ lisanulQuranPlaylist.js
-│  └─ App.jsx
-├─ index.html
-├─ package.json
-├─ vite.config.js
-└─ README.md
-```
-
-## Deployment
-
-### GitHub Pages
-
-This project is already configured for GitHub Pages deployment.
-
-Build/deploy command:
-
-```bash
-npm run deploy
-```
-
-Important:
-
-- The current deploy script assumes your repository path is `/nur-academy/`
-- If your GitHub repository name is different, update both:
-  - `package.json`
-  - `vite.config.js`
-
-Current deploy script:
-
-```json
-"deploy": "vite build --base /nur-academy/ && gh-pages -d dist"
-```
-
-### Railway
-
-When you move to Railway later:
-
-- Keep the Vite production base as `/`
-- Add a backend API
-- Move auth from browser-only mode to real server auth
-- Move progress, notes, certificates, and course management into a database
-- Issue server-verified certificates instead of browser-generated ones
-
-## Certificates
-
-The app already supports certificate generation for completed courses.
-
-Current behavior:
-
-- Certificate IDs are generated in the browser
-- Users can print or save the certificate as PDF
-
-Recommended Railway upgrade later:
-
-- Store certificate records in a database
-- Generate server-verified certificate IDs
-- Add downloadable certificate verification pages
-
-## Current Limitations
-
-Because this first version is designed for static hosting, the current app uses browser storage instead of a backend.
-
-That means:
-
-- Data is tied to the browser/device
-- Admin tools are UI-only and read-only for now
-- Certificates are not yet server-verified
-- Users cannot sync progress across devices yet
-
-## Recommended Next Steps
-
-For the next phase of the project, the best improvements would be:
-
-1. Add a Railway backend with a database
-2. Move authentication to the backend
-3. Store courses, playlists, students, notes, and completions in the database
-4. Add certificate verification pages
-5. Add instructor-managed course creation from the admin side
-
-## Scripts
+## Available Scripts
 
 ```json
 {
@@ -253,14 +122,101 @@ For the next phase of the project, the best improvements would be:
 }
 ```
 
-## Notes for Production Use
+## Project Structure
 
-This app is a strong first version for:
+```txt
+Nur Academy/
+├─ public/
+├─ scripts/
+│  └─ youtube_playlist_import.py
+├─ src/
+│  ├─ assets/
+│  ├─ components/
+│  │  ├─ Certificate.jsx
+│  │  ├─ CertificatePage.jsx
+│  │  └─ HadiyaSupportCard.jsx
+│  ├─ data/
+│  ├─ App.jsx
+│  └─ main.jsx
+├─ index.html
+├─ package.json
+├─ vite.config.js
+└─ README.md
+```
 
-- launching quickly on GitHub Pages
-- demonstrating the learning flow
-- validating the course experience
-- onboarding early students
+## Adding or Updating Courses
 
-For serious multi-user production use, Railway plus a backend database is the right next step.
+Nur Academy is designed so new YouTube courses can be added without rebuilding the whole product architecture.
 
+### Playlist-based workflow
+
+1. Import playlist data into `src/data/`
+2. Export a playlist ID and lesson array
+3. Create a module builder in [`src/App.jsx`](src/App.jsx)
+4. Register the course in the `COURSES` array
+
+Each playlist item follows a simple pattern:
+
+```js
+export const MY_PLAYLIST_ID = "PLxxxxxxxxxxxxxxxx";
+
+export const MY_PLAYLIST_ITEMS = [
+  { index: 1, youtubeId: "VIDEO_ID_1", duration: "12:34", sourceTitle: "Lesson 1" },
+  { index: 2, youtubeId: "VIDEO_ID_2", duration: "08:51", sourceTitle: "Lesson 2" },
+];
+```
+
+### Import helper
+
+The repository also includes [`scripts/youtube_playlist_import.py`](scripts/youtube_playlist_import.py) to speed up playlist imports and reduce manual work.
+
+## Deployment
+
+### GitHub Pages
+
+The project is already set up for a GitHub Pages-style deployment flow.
+
+```bash
+npm run deploy
+```
+
+If your repository name is not `nur-academy`, update the base path in:
+
+- [`package.json`](package.json)
+- [`vite.config.js`](vite.config.js)
+
+### Future Backend Migration
+
+The current version is intentionally local-first, but it is also a good base for a future backend migration. A next phase could move:
+
+- authentication to a real auth provider
+- progress and notes into a database
+- certificate records into server-side storage
+- course management into a persistent admin backend
+- cross-device sync into a proper user account system
+
+## Current Limitations
+
+Because the app is currently browser-based, there are a few important limitations:
+
+- user data is stored per browser, not per cloud account
+- progress does not sync across devices
+- certificates are generated client-side
+- some YouTube videos may not allow embedding on external websites
+
+When YouTube embedding is blocked, Nur Academy falls back gracefully by giving learners a direct YouTube link and a manual completion option.
+
+## Support and Course Requests
+
+If you think a useful YouTube course should be added to the website, you can contact the academy directly:
+
+- Email: `mohdashfaq1416@gmail.com`
+- WhatsApp: `+91 7006370956`
+
+This is especially helpful for suggesting new playlists, missing topics, or better course sources.
+
+## Vision
+
+Nur Academy is not just a video directory. The vision is to build an Islamic learning platform that feels calm, respectful, structured, and genuinely useful for students of knowledge.
+
+The current version already offers a strong learning experience on static hosting, and it is well positioned to grow into a more complete LMS over time.

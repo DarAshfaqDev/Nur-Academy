@@ -1,0 +1,25 @@
+export const ILM_UN_NAHW_PLAYLIST_ID = "PLw2_W6dEf3pJoBPsQQoHyVCpGrN1OPXT6";
+
+export const ILM_UN_NAHW_PLAYLIST_ITEMS = [
+  { index: 1, youtubeId: "zFzF191taL8", duration: "25:23", sourceTitle: "ilm un Nahw Basic Arabic Grammar  Course lec No 1||علم النحو، تعارف،  کلمہ کی تین قسمیں||" },
+  { index: 2, youtubeId: "6hamRKjhwzc", duration: "22:55", sourceTitle: "Basic Arabic Grammar Nahw Course lec No 2||علم النحو، اسم کی علامات|| By Mufti Muhammad Sb" },
+  { index: 3, youtubeId: "HYFsf3DbdRA", duration: "34:16", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 3||علم النحو، اسم  فعل کی علامات|| Mufti Muhammad" },
+  { index: 4, youtubeId: "YaN7q4IcHF4", duration: "14:37", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 4||علم النحو، اسم  فعل کی علامات|| Mufti Muhammad" },
+  { index: 5, youtubeId: "kU0ZEDroUEs", duration: "23:26", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 5||واحد تثنیہ اور جمع|| Mufti Muhammad" },
+  { index: 6, youtubeId: "zRRF8OwRQDE", duration: "25:29", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 6||واحد تثنیہ اور جمع|| Mufti Muhammad" },
+  { index: 7, youtubeId: "vnXZOPuktWk", duration: "31:27", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 7||مذکر و مؤنث|| Mufti Muhammad" },
+  { index: 8, youtubeId: "NUMqWrhS5m4", duration: "23:13", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 8||مذکر و مؤنث|| Mufti Muhammad" },
+  { index: 9, youtubeId: "sHCXHFiikSk", duration: "13:05", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 9||معرفہ و نکرہ|| Mufti Muhammad" },
+  { index: 10, youtubeId: "vlr4-g3CHa0", duration: "30:25", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 10||الصیاد والحمام اجراء|| Mufti Muhammad" },
+  { index: 11, youtubeId: "h0OX2nTPEx0", duration: "19:24", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 11||حروف قمریہ اور شمسیہ|| Mufti Muhammad" },
+  { index: 12, youtubeId: "hrzxjc55DIM", duration: "28:30", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 12||مرکب مفید غیر مفید|| Mufti Muhammad" },
+  { index: 13, youtubeId: "7F_e1nYgfhw", duration: "31:10", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 13||جملہ اسمیہ فعلیہ مشق|| Mufti Muhammad" },
+  { index: 14, youtubeId: "xeaKVX3cQIM", duration: "25:39", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 14||جملہ خبریہ جملہ انشائیہ|| Mufti Muhammad" },
+  { index: 15, youtubeId: "ViG36qvR1SE", duration: "25:52", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 15||مرکب توصیفی || Mufti Muhammad" },
+  { index: 16, youtubeId: "GfJ4IhXxI8s", duration: "25:42", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 16||مرکب غیر مفید کی قسمیں || Mufti Muhammad" },
+  { index: 17, youtubeId: "o6BZWlZ0jjY", duration: "20:30", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 17||اعراب || Mufti Muhammad" },
+  { index: 18, youtubeId: "OEgSqz2BiVw", duration: "26:41", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 18||مرکب اضافی کی مختلف شکلیں || Mufti Muhammad" },
+  { index: 19, youtubeId: "af-6o452lsE", duration: "27:19", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 19||مرکب اضافی کی مختلف شکلیں || Mufti Muhammad" },
+  { index: 20, youtubeId: "JSFz9z7bxdc", duration: "45:32", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 20||مرکب اضافی کی مختلف شکلیں || Mufti Muhammad" },
+  { index: 21, youtubeId: "tVsNrsDYWyY", duration: "38:32", sourceTitle: "ilm un Nahw  Basic Arabic Grammar course Lec No 21||مرکب اضافی کی مختلف شکلیں || Mufti Muhammad" },
+];

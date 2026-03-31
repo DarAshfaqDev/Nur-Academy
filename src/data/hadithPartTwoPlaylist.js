@@ -1,0 +1,28 @@
+export const HADITH_PART_TWO_PLAYLIST_ID = "PL8Qy4ewy0UXWqnH54WCMuMEikvCjES-4Q";
+
+export const HADITH_PART_TWO_PLAYLIST_ITEMS = [
+  { index: 1, youtubeId: "aN_bLdtQyUE", duration: "1:03:32", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 1  ll Syed Adnan Kakakhail" },
+  { index: 2, youtubeId: "DM7QbWNujWk", duration: "1:14:46", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson2 ll Syed Adnan Kakakhail" },
+  { index: 3, youtubeId: "oxNrYxR2WOM", duration: "1:04:57", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 3 ll Syed Adnan Kakakhail" },
+  { index: 4, youtubeId: "hdQAz-Dvuto", duration: "1:03:35", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 4 ll Syed Adnan Kakakhail" },
+  { index: 5, youtubeId: "CzheLFKYdM4", duration: "1:09:34", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 5 ll Syed Adnan Kakakhail" },
+  { index: 6, youtubeId: "mk2acgC3WRc", duration: "1:02:44", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 6 ll Syed Adnan Kakakhail" },
+  { index: 7, youtubeId: "15U7V5Z4y-w", duration: "1:01:41", sourceTitle: "Online Hadees course, Urdu Lecture No.07 ll Mufti Syed Adnan Kakakhail" },
+  { index: 8, youtubeId: "frxT59ItgE4", duration: "1:01:57", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 9 ll Hadith course ll Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 9, youtubeId: "6cMefWXkles", duration: "1:06:39", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 10 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 10, youtubeId: "UPeJwjkngQw", duration: "1:03:35", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 11 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 11, youtubeId: "HAEx3bXGVFs", duration: "1:02:49", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 12 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 12, youtubeId: "pdLIUXjvnQA", duration: "1:01:43", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 13 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 13, youtubeId: "yEfOD1r_N0I", duration: "1:05:33", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 14 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 14, youtubeId: "of4QmAtrgX8", duration: "1:00:56", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 15 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 15, youtubeId: "kvzPXaObPLo", duration: "28:39", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 16 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 16, youtubeId: "Bg0iqQbzYgQ", duration: "57:37", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 17 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 17, youtubeId: "5sfYQadHaIA", duration: "1:00:50", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 18 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 18, youtubeId: "8JFJcAMslbU", duration: "1:04:07", sourceTitle: "Online Hadees course in Urdu & Hindi, Lesson 19  ll Syed Adnan Kakakhail" },
+  { index: 19, youtubeId: "Qb8jdG1XEqU", duration: "58:55", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 20 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 20, youtubeId: "MMpOxnxDozk", duration: "1:00:34", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 21 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 21, youtubeId: "jBXPXjtFKe4", duration: "1:06:33", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 22 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 22, youtubeId: "KWku4CXoDxs", duration: "57:05", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 23 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 23, youtubeId: "7usYf2lO9u4", duration: "59:31", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 24 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+  { index: 24, youtubeId: "6wgGbbpxtzg", duration: "1:05:14", sourceTitle: "Online Hadees Course in Urdu & Hindi, Lecture 25 l Hadith course l Syed Adnan Kakakhail ll حدیث کورس" },
+];
