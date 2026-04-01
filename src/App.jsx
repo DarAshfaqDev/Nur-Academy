@@ -112,6 +112,12 @@ const injectCSS = () => {
     th{padding:10px 14px;text-align:left;font-size:.7rem;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #E5E7EB}
     td{padding:12px 14px;border-bottom:1px solid #F3F4F6;font-size:.83rem;vertical-align:middle}
     tr:last-child td{border-bottom:none}
+    .contact-hero-shell,.contact-main-grid{width:min(100%,1180px);margin:0 auto}
+    .contact-hero-actions,.contact-form-actions{display:flex;gap:12px;flex-wrap:wrap}
+    .contact-hero-actions .btn,.contact-form-actions .btn{justify-content:center}
+    .contact-info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;max-width:720px}
+    .contact-quick-topics{display:flex;flex-wrap:wrap;gap:8px}
+    .contact-card{min-width:0}
 
     @media (max-width:1100px){
       .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))!important}
@@ -151,6 +157,12 @@ const injectCSS = () => {
       .action-row .btn{width:100%;justify-content:center}
       .table-wrap table{min-width:680px}
       .course-detail-enroll{width:100%!important}
+      .contact-hero-shell,.contact-main-grid{width:100%!important}
+      .contact-hero-actions,.contact-form-actions{flex-direction:column!important}
+      .contact-hero-actions .btn,.contact-form-actions .btn{width:100%!important}
+      .contact-info-grid{grid-template-columns:1fr!important;max-width:none!important}
+      .contact-quick-topics{display:grid!important;grid-template-columns:1fr 1fr}
+      .contact-card{padding:20px!important;border-radius:18px!important}
     }
   `;
   document.head.appendChild(s);
@@ -2026,6 +2038,25 @@ const AdminDB = {
       }));
     }).sort((a, b) => String(b.completion?.completedAt || "").localeCompare(String(a.completion?.completedAt || "")));
   },
+  certificateStatusForUser: (userId) => {
+    const data = mergeUserState(readAllUserData()[userId] || {});
+    return getCourseCatalog()
+      .map(course => resolveCourse(course))
+      .filter(course => totalLessons(course) > 0)
+      .map(course => ({
+        course,
+        completion: data.completions[String(course.id)] || null,
+        issued: Boolean(data.completions[String(course.id)]),
+      }))
+      .sort((a, b) => a.course.title.localeCompare(b.course.title));
+  },
+  resetLearning: (userId) => {
+    if (!Auth.isAdmin()) throw new Error("Only administrators can reset course data.");
+    const allData = readAllUserData();
+    allData[userId] = defaultUserState();
+    ls.set(K.DATA, allData);
+    return true;
+  },
 };
 
 class AppCrashBoundary extends Component {
@@ -2671,8 +2702,11 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
   const [fallback, setFallback] = useState(false);
   const [playerError, setPlayerError] = useState(null);
   const watchUrl = id ? `https://www.youtube.com/watch?v=${id}${playlistId ? `&list=${playlistId}` : ""}` : "#";
+  const embedOrigin = typeof window !== "undefined" && window.location?.origin
+    ? `&origin=${encodeURIComponent(window.location.origin)}`
+    : "";
   const embedSrc = id
-    ? `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1${playlistId ? `&list=${encodeURIComponent(playlistId)}` : ""}`
+    ? `https://www.youtube.com/embed/${id}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1${playlistId ? `&list=${encodeURIComponent(playlistId)}` : ""}${embedOrigin}`
     : "";
 
   useEffect(() => {
@@ -2745,7 +2779,6 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
       if (cancelled || !mountRef.current || !mountRef.current.contains(host)) return;
       onTrackingChange?.(true);
       playerRef.current = new YT.Player(host, {
-        host: "https://www.youtube-nocookie.com",
         videoId: id,
         width: "100%",
         height: "100%",
@@ -2753,6 +2786,7 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
           rel: 0,
           modestbranding: 1,
           playsinline: 1,
+          ...(playlistId ? { listType: "playlist", list: playlistId } : {}),
           ...(typeof window !== "undefined" && window.location?.origin
             ? { origin: window.location.origin }
             : {}),
@@ -4832,6 +4866,7 @@ const ContactPage = () => {
     name: "",
     email: "",
     subject: "Course request for Nur Academy",
+    playlistUrl: "",
     message: "",
   });
 
@@ -4842,6 +4877,7 @@ const ContactPage = () => {
     const body = [
       `Name: ${form.name.trim() || "Not provided"}`,
       `Email: ${form.email.trim() || "Not provided"}`,
+      `Playlist URL: ${form.playlistUrl.trim() || "Not provided"}`,
       "",
       form.message.trim() || suggestionPrompt,
       "",
@@ -4866,7 +4902,7 @@ const ContactPage = () => {
     <div className="page" style={{paddingTop:64}}>
       <div style={{background:`radial-gradient(circle at top right, rgba(201,168,76,.22), transparent 34%), linear-gradient(160deg,${C.emD},${C.em})`,padding:"58px 5% 48px",position:"relative",overflow:"hidden"}}>
         <Iso op={0.08} col={C.gold}/>
-        <div className="split-grid" style={{maxWidth:1180,margin:"0 auto",gridTemplateColumns:"1.1fr .9fr",gap:34,alignItems:"center",position:"relative",zIndex:1}}>
+        <div className="split-grid contact-hero-shell" style={{gridTemplateColumns:"1.1fr .9fr",gap:34,alignItems:"center",position:"relative",zIndex:1}}>
           <div>
             <Badge col={C.gold}>Support • Course Requests • WhatsApp</Badge>
             <h1 style={{fontFamily:"'Amiri',serif",fontSize:"clamp(2rem,4vw,2.9rem)",color:"white",margin:"14px 0 6px"}}>Contact Nur Academy</h1>
@@ -4874,11 +4910,11 @@ const ContactPage = () => {
             <p style={{color:"rgba(255,255,255,.78)",lineHeight:1.8,maxWidth:620,fontSize:".95rem",marginBottom:18}}>
               Need help with a course, login, certificate, or study path? Reach out directly and we will review it, in sha Allah. If you think a valuable YouTube course should be added to the academy, send the request here.
             </p>
-            <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}>
+            <div className="contact-hero-actions" style={{marginBottom:18}}>
               <Btn v="gold" onClick={openEmailDraft}>Write Email</Btn>
               <Btn v="dark" onClick={openWhatsAppDraft}>Message on WhatsApp</Btn>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,maxWidth:720}}>
+            <div className="contact-info-grid">
               {[
                 { label:"Support Email", value:contactEmail },
                 { label:"WhatsApp", value:contactPhone },
@@ -4891,7 +4927,7 @@ const ContactPage = () => {
               ))}
             </div>
           </div>
-          <div style={{background:"rgba(255,255,255,.08)",borderRadius:24,padding:22,border:"1px solid rgba(255,255,255,.12)",boxShadow:"0 24px 60px rgba(0,0,0,.18)",backdropFilter:"blur(10px)"}}>
+          <div className="contact-card" style={{background:"rgba(255,255,255,.08)",borderRadius:24,padding:22,border:"1px solid rgba(255,255,255,.12)",boxShadow:"0 24px 60px rgba(0,0,0,.18)",backdropFilter:"blur(10px)"}}>
             <div style={{fontSize:".72rem",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:C.gold,marginBottom:8}}>Course Suggestion Notice</div>
             <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.38rem",fontWeight:700,color:"white",marginBottom:8}}>Request a YouTube course for the website</div>
             <p style={{color:"rgba(255,255,255,.78)",fontSize:".88rem",lineHeight:1.75,marginBottom:14}}>
@@ -4910,9 +4946,9 @@ const ContactPage = () => {
           </div>
         </div>
       </div>
-      <div className="split-grid" style={{padding:"48px 5% 64px",background:C.cream,maxWidth:1180,margin:"0 auto",gridTemplateColumns:"1fr 1fr",gap:32}}>
+      <div className="split-grid contact-main-grid" style={{padding:"48px 5% 64px",background:C.cream,gridTemplateColumns:"1fr 1fr",gap:32}}>
         <div style={{display:"grid",gap:16}}>
-          <div style={{background:"white",borderRadius:20,padding:24,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+          <div className="contact-card" style={{background:"white",borderRadius:20,padding:24,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:14}}>
               <div>
                 <div style={{fontSize:".72rem",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:5}}>Ways to Reach Us</div>
@@ -4935,10 +4971,10 @@ const ContactPage = () => {
               </a>
             ))}
           </div>
-          <div style={{background:`linear-gradient(180deg, white, ${C.gold}08)`,borderRadius:20,padding:24,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+          <div className="contact-card" style={{background:`linear-gradient(180deg, white, ${C.gold}08)`,borderRadius:20,padding:24,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
             <div style={{fontSize:".72rem",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>What You Can Send</div>
             <h3 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.34rem",color:C.emD,marginBottom:12}}>Helpful reasons to contact the academy</h3>
-            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
+            <div className="contact-quick-topics" style={{marginBottom:14}}>
               {quickTopics.map(topic => (
                 <button
                   key={topic}
@@ -4955,13 +4991,13 @@ const ContactPage = () => {
             </p>
           </div>
         </div>
-        <div style={{background:"white",borderRadius:20,padding:26,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+        <div className="contact-card" style={{background:"white",borderRadius:20,padding:26,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
           <div style={{fontSize:".72rem",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>Write to Us</div>
           <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.46rem",color:C.emD,marginBottom:10}}>Send your request in one step</h2>
           <p style={{fontSize:".83rem",color:C.textM,lineHeight:1.7,marginBottom:18}}>
             Fill this in and then choose email or WhatsApp. The message will open with your details already prepared.
           </p>
-          {[["Name", "name", "text", "Your name"], ["Email", "email", "email", "your@email.com"], ["Subject", "subject", "text", "Course request for Nur Academy"]].map(([label, key, type, placeholder]) => (
+          {[["Name", "name", "text", "Your name"], ["Email", "email", "email", "your@email.com"], ["Subject", "subject", "text", "Course request for Nur Academy"], ["Playlist URL", "playlistUrl", "url", "https://www.youtube.com/playlist?list=..."]].map(([label, key, type, placeholder]) => (
             <div key={key} style={{marginBottom:14}}>
               <label style={{display:"block",fontSize:".69rem",fontWeight:700,color:C.textL,letterSpacing:".08em",textTransform:"uppercase",marginBottom:6}}>{label}</label>
               <input
@@ -4983,9 +5019,9 @@ const ContactPage = () => {
               style={{width:"100%",padding:"12px 14px",borderRadius:12,border:`1px solid ${C.border}`,background:C.cream,fontSize:".86rem",resize:"vertical",lineHeight:1.7,outline:"none"}}
             />
           </div>
-          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:14}}>
-            <Btn v="primary" style={{flex:"1 1 220px",justifyContent:"center"}} onClick={openEmailDraft}>Write Email</Btn>
-            <Btn v="gold" style={{flex:"1 1 220px",justifyContent:"center"}} onClick={openWhatsAppDraft}>Send on WhatsApp</Btn>
+          <div className="contact-form-actions" style={{marginBottom:14}}>
+            <Btn v="primary" style={{flex:"1 1 220px"}} onClick={openEmailDraft}>Write Email</Btn>
+            <Btn v="gold" style={{flex:"1 1 220px"}} onClick={openWhatsAppDraft}>Send on WhatsApp</Btn>
           </div>
           <div style={{padding:"12px 14px",borderRadius:14,background:`${C.em}08`,border:`1px solid ${C.border}`}}>
             <div style={{fontSize:".77rem",lineHeight:1.7,color:C.textM}}>
@@ -5032,6 +5068,8 @@ const AdminPage = ({ setPage, currentUser }) => {
   const adminCount = users.filter(user => user.role === "admin").length;
   const recentUsers = [...users].sort((a, b) => String(b.joinedAt || "").localeCompare(String(a.joinedAt || ""))).slice(0, 5);
   const recentCertificates = certificates.slice(0, 6);
+  const adminCertificateStatus = AdminDB.certificateStatusForUser(currentUser?.id || "");
+  const adminIssuedCertificates = certificates.filter(record => record.user.id === currentUser?.id);
 
   const sync = useCallback(() => {
     setUsers(AdminDB.users());
@@ -5152,6 +5190,18 @@ const AdminPage = ({ setPage, currentUser }) => {
     }
   };
 
+  const handleResetAdminLearning = () => {
+    if (!currentUser?.id) return;
+    if (!window.confirm("Reset all enrolled courses, progress, watch time, notes, streak, and certificates for the current admin account on this browser?")) return;
+    try {
+      AdminDB.resetLearning(currentUser.id);
+      sync();
+      flash("Admin learning progress has been reset to zero on this browser.");
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
+
   if (!currentUser || currentUser.role !== "admin") {
     return (
       <div className="page" style={{paddingTop:64,minHeight:"100vh",background:C.cream,display:"flex",alignItems:"center",justifyContent:"center",padding:"64px 20px"}}>
@@ -5242,6 +5292,9 @@ const AdminPage = ({ setPage, currentUser }) => {
         {sec==="users"&&(
           <div className="page">
             <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E",marginBottom:18}}>User Management</h1>
+            <div style={{background:"white",borderRadius:12,padding:"13px 16px",boxShadow:"0 2px 8px rgba(0,0,0,.06)",marginBottom:16,fontSize:".78rem",color:"#6B7280",lineHeight:1.65}}>
+              Only accounts created in this same browser are visible here right now. If your classmate signed up on another phone, laptop, browser, or private window, that account will not appear until a shared backend and database are connected.
+            </div>
             <div className="grid-2" style={{gridTemplateColumns:"minmax(320px,420px) 1fr",gap:16}}>
               <form onSubmit={handleCreateUser} style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
                 <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:12}}>Add User</div>
@@ -5366,7 +5419,44 @@ const AdminPage = ({ setPage, currentUser }) => {
         )}
         {sec==="certs"&&(
           <div className="page">
-            <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E",marginBottom:18}}>Certificate Records</h1>
+            <div className="admin-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+              <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E"}}>Certificate Records</h1>
+              <Btn v="danger" onClick={handleResetAdminLearning}>Reset My Course Progress</Btn>
+            </div>
+            <div className="grid-2" style={{gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+              <div style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:10}}>Courses That Can Issue Certificates</div>
+                <div style={{fontSize:".76rem",lineHeight:1.65,color:"#6B7280",marginBottom:12}}>
+                  Every listed course below uses the same certificate flow. A certificate is issued after all lessons are completed and the learner reaches at least {CERTIFICATE_WATCH_THRESHOLD}% watch time on supported videos.
+                </div>
+                <div style={{display:"grid",gap:8}}>
+                  {adminCertificateStatus.map(item => (
+                    <div key={item.course.id} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>
+                      <span style={{fontSize:".8rem",fontWeight:700,color:"#1A1A2E"}}>{item.course.title}</span>
+                      <Badge col={item.issued ? C.green : C.gold}>{item.issued ? "Issued" : "Not Yet"}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:10}}>Current Admin Account</div>
+                <div style={{fontSize:".78rem",lineHeight:1.65,color:"#6B7280",marginBottom:12}}>
+                  Signed in as <strong style={{color:"#1A1A2E"}}>{currentUser.email}</strong>. Issued certificates for this account on this browser: <strong style={{color:"#1A1A2E"}}>{adminIssuedCertificates.length}</strong>.
+                </div>
+                <div style={{display:"grid",gap:8}}>
+                  {adminIssuedCertificates.length === 0 ? (
+                    <div style={{padding:"12px 14px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB",fontSize:".78rem",color:"#6B7280"}}>
+                      No certificate has been issued for the current admin account on this browser yet.
+                    </div>
+                  ) : adminIssuedCertificates.map((record, idx) => (
+                    <div key={`${record.course.id}-${idx}`} style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>
+                      <div style={{fontWeight:700,fontSize:".8rem",color:"#1A1A2E",marginBottom:3}}>{record.course.title}</div>
+                      <div style={{fontSize:".7rem",color:"#6B7280"}}>{record.completion.certificateId}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
             <div className="table-wrap" style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
               <div style={{padding:"13px 17px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:".86rem",color:"#1A1A2E"}}>Issued Certificates</div>
               <table>
