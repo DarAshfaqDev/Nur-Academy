@@ -1,13 +1,18 @@
 import CertificatePage, { exportCertificatePdf } from "./components/CertificatePage";
 import { Component, useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
+import sealImage from "./assets/nur_seal.png";
 import signatureImage from "./assets/signature-optimized.png";
 import HadiyaSupportCard from "./components/HadiyaSupportCard";
 import { AASAN_ARABIC_GRAMMAR_PLAYLIST_ID, AASAN_ARABIC_GRAMMAR_PLAYLIST_ITEMS } from "./data/aasanArabicGrammarPlaylist";
 import { AQIDAH_ENGLISH_PLAYLIST_ID, AQIDAH_ENGLISH_PLAYLIST_ITEMS } from "./data/aqidahEnglishPlaylist";
+import { AQIDAH_NEW_PLAYLIST_ID, AQIDAH_NEW_PLAYLIST_ITEMS } from "./data/aqidahNewPlaylist";
 import { AQIDAH_URDU_PLAYLIST_ID, AQIDAH_URDU_PLAYLIST_ITEMS } from "./data/aqidahUrduPlaylist";
+import { AJOOROOMIYYA_PLAYLIST_ID, AJOOROOMIYYA_PLAYLIST_ITEMS } from "./data/ajooroomiyyaPlaylist";
+import { ARABIYYA_BAYNA_YADAYK_PLAYLIST_ID, ARABIYYA_BAYNA_YADAYK_PLAYLIST_ITEMS } from "./data/arabiyyaBaynaYadaykPlaylist";
 import { ARBI_KA_MUALLIM_PLAYLIST_ID, ARBI_KA_MUALLIM_PLAYLIST_ITEMS } from "./data/arbiKaMuallimPlaylist";
 import { HAJJ_PLAYLIST_ID, HAJJ_PLAYLIST_ITEMS } from "./data/hajjPlaylist";
+import { HIFZ_QURAN_PLAYLIST_ID, HIFZ_QURAN_PLAYLIST_ITEMS } from "./data/hifzQuranPlaylist";
 import { INSURANCE_PLAYLIST_ID, INSURANCE_PLAYLIST_ITEMS } from "./data/insurancePlaylist";
 import { LISANUL_QURAN_PLAYLIST_ID, LISANUL_QURAN_PLAYLIST_ITEMS } from "./data/lisanulQuranPlaylist";
 import { ILM_UN_NAHW_PLAYLIST_ID, ILM_UN_NAHW_PLAYLIST_ITEMS } from "./data/ilmUnNahwPlaylist";
@@ -20,6 +25,8 @@ import { NOORANI_QAIDA_A_PLAYLIST_ID, NOORANI_QAIDA_A_PLAYLIST_ITEMS } from "./d
 import { NOORANI_QAIDA_B_PLAYLIST_ID, NOORANI_QAIDA_B_PLAYLIST_ITEMS } from "./data/nooraniQaidaBPlaylist";
 import { PROPHETIC_LIFE_PLAYLIST_ID, PROPHETIC_LIFE_PLAYLIST_ITEMS } from "./data/propheticLifePlaylist";
 import { PROPHETIC_PARENTING_PLAYLIST_ID, PROPHETIC_PARENTING_PLAYLIST_ITEMS } from "./data/propheticParentingPlaylist";
+import { QAIDA_TRACK_TWO_PLAYLIST_ID, QAIDA_TRACK_TWO_PLAYLIST_ITEMS } from "./data/qaidaTrackTwoPlaylist";
+import { RECITE_QURAN_PROPERLY_PLAYLIST_ID, RECITE_QURAN_PROPERLY_PLAYLIST_ITEMS } from "./data/reciteQuranProperlyPlaylist";
 import { SHORT_SEERAH_PLAYLIST_ID, SHORT_SEERAH_PLAYLIST_ITEMS } from "./data/shortSeerahPlaylist";
 import { SISTERS_TAJWEED_PLAYLIST_ID, SISTERS_TAJWEED_PLAYLIST_ITEMS } from "./data/sistersTajweedPlaylist";
 import { TAJWEED_COURSE_PLAYLIST_ID, TAJWEED_COURSE_PLAYLIST_ITEMS } from "./data/tajweedCoursePlaylist";
@@ -889,29 +896,45 @@ const buildQaidaModules = (items, opts={}) =>
       );
     })
     .filter(section => section.lessons.length > 0);
-const QAIDA_DEFAULT_TRACK = "madani";
 const QAIDA_TRACKS = {
-  madani: {
-    key: "madani",
-    label: "Madani Qaida",
-    note: "Madani Qaida playlist with a full structured lesson set.",
-    playlist: MADANI_QAIDA_PLAYLIST_ID,
-    modules: buildQaidaModules(MADANI_QAIDA_PLAYLIST_ITEMS, { trackLabel: "Madani Qaida" }),
-  },
-  noorani: {
-    key: "noorani",
+  nooraniClassic: {
+    key: "nooraniClassic",
     label: "Noorani Qaida",
-    note: "Full Noorani Qaida route using the 116-lesson playlist you shared.",
+    note: "Full Noorani Qaida route using the main 116-lesson playlist.",
     playlist: NOORANI_QAIDA_A_PLAYLIST_ID,
     modules: buildQaidaModules(NOORANI_QAIDA_A_PLAYLIST_ITEMS, { trackLabel: "Noorani Qaida", groupSize: 12 }),
   },
-  nooraniAlt: {
-    key: "nooraniAlt",
+  madaniJourney: {
+    key: "madaniJourney",
+    label: "Madani Qaida Journey",
+    note: "A longer Madani Qaida route with 79 lesson parts.",
+    playlist: QAIDA_TRACK_TWO_PLAYLIST_ID,
+    modules: buildQaidaModules(QAIDA_TRACK_TWO_PLAYLIST_ITEMS, { trackLabel: "Madani Qaida Journey", groupSize: 10 }),
+  },
+  madaniClassic: {
+    key: "madaniClassic",
+    label: "Madani Qaida Classic",
+    note: "The original Madani Qaida track with 77 lesson parts.",
+    playlist: MADANI_QAIDA_PLAYLIST_ID,
+    modules: buildQaidaModules(MADANI_QAIDA_PLAYLIST_ITEMS, { trackLabel: "Madani Qaida Classic", groupSize: 10 }),
+  },
+  nooraniBasics: {
+    key: "nooraniBasics",
     label: "Noorani Basics",
     note: "Alternate 68-lesson Noorani Qaida playlist for a shorter route.",
     playlist: NOORANI_QAIDA_B_PLAYLIST_ID,
     modules: buildQaidaModules(NOORANI_QAIDA_B_PLAYLIST_ITEMS, { trackLabel: "Noorani Qaida Basics", groupSize: 12 }),
   },
+};
+const NOORANI_QAIDA_DEFAULT_TRACK = "nooraniClassic";
+const MADANI_QAIDA_DEFAULT_TRACK = "madaniJourney";
+const NOORANI_QAIDA_TRACKS = {
+  nooraniClassic: QAIDA_TRACKS.nooraniClassic,
+  nooraniBasics: QAIDA_TRACKS.nooraniBasics,
+};
+const MADANI_QAIDA_TRACKS = {
+  madaniJourney: QAIDA_TRACKS.madaniJourney,
+  madaniClassic: QAIDA_TRACKS.madaniClassic,
 };
 
 const lisanLessonTitle = ({ index, sourceTitle }) => {
@@ -1424,6 +1447,107 @@ const buildAasanArabicGrammarModules = (items) =>
       );
     })
     .filter(section => section.lessons.length > 0);
+const arabiyyaBaynaYadaykLessonTitle = ({ index, sourceTitle }) => {
+  const raw = cleanSourceTitle(sourceTitle);
+  const book = raw.match(/Book\s*(\d+)/i);
+  const topic = raw
+    .replace(/^Learn Arabic from scratch\s*:\s*/i, "")
+    .replace(/Lesson\s*\d+\s*-\s*/i, "")
+    .replace(/Al Arabiyya Bayna Yadayk/gi, "")
+    .replace(/\|\s*Book\s*\d+/i, "")
+    .replace(/\s*\|\s*/g, " / ")
+    .replace(/^[\s\-:/.]+|[\s\-:/.]+$/g, "")
+    .trim();
+
+  const label = [book ? `Book ${book[1]}` : "", topic]
+    .filter(Boolean)
+    .join(" / ") || "Al Arabiyya Bayna Yadayk";
+
+  return `Lesson ${pad(index)} - ${label}`;
+};
+const buildArabiyyaBaynaYadaykModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 8)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l33a${pad(item.index)}`,
+        arabiyyaBaynaYadaykLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 3,
+          desc: "Imported from the Learn Arabic from Scratch with Al Arabiyya Bayna Yadayk playlist.",
+        }
+      ));
+
+      return mkModule(
+        `m33a${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["📘","🗣️","✍️","🧠","📚","🧭","✨","🏁"][idx % 8],
+        `Al Arabiyya Bayna Yadayk lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const ajooroomiyyaLessonTitle = ({ index, sourceTitle }) => {
+  const raw = cleanSourceTitle(sourceTitle);
+  if (/Full Explanation/i.test(raw)) {
+    return `Lesson ${pad(index)} - Full Explanation of Al Ajooroomiyya`;
+  }
+
+  const lesson = raw.match(/Lesson\s*(\d+)\s*\/\s*36/i);
+  const topic = raw
+    .replace(/^Arabic Grammar\s*\|\s*/i, "")
+    .replace(/Lesson\s*\d+\s*\/\s*36\s*\|\s*/i, "")
+    .replace(/Al Ajoroomiyya\s*-\s*الآجرومية/i, "")
+    .replace(/^[\s\-:/.]+|[\s\-:/.]+$/g, "")
+    .trim();
+
+  return `Lesson ${pad(index)} - ${topic || (lesson ? `Grammar Lesson ${lesson[1]}` : "Al Ajooroomiyya")}`;
+};
+const buildAjooroomiyyaModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 7)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l33b${pad(item.index)}`,
+        ajooroomiyyaLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 2,
+          desc: "Imported from the Arabic Grammar Al Ajooroomiyya playlist.",
+        }
+      ));
+
+      return mkModule(
+        `m33b${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["✒️","📚","🧠","📝","📖","🏁"][idx % 6],
+        `Al Ajooroomiyya lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const ARABIC_LEARNING_PATH_DEFAULT_TRACK = "arabiyyaBaynaYadayk";
+const ARABIC_LEARNING_PATH_TRACKS = {
+  arabiyyaBaynaYadayk: {
+    key: "arabiyyaBaynaYadayk",
+    label: "Al Arabiyya Bayna Yadayk",
+    note: "A full Arabic-from-scratch pathway using the Al Arabiyya Bayna Yadayk series across the linked playlist lessons.",
+    playlist: ARABIYYA_BAYNA_YADAYK_PLAYLIST_ID,
+    modules: buildArabiyyaBaynaYadaykModules(ARABIYYA_BAYNA_YADAYK_PLAYLIST_ITEMS),
+  },
+  ajooroomiyya: {
+    key: "ajooroomiyya",
+    label: "Al Ajooroomiyya Grammar",
+    note: "A structured Arabic grammar route built from the Al Ajooroomiyya lesson series.",
+    playlist: AJOOROOMIYYA_PLAYLIST_ID,
+    modules: buildAjooroomiyyaModules(AJOOROOMIYYA_PLAYLIST_ITEMS),
+  },
+};
 const sarfLessonTitle = ({ index, sourceTitle }) => {
   const parts = cleanSourceTitle(sourceTitle)
     .split("|")
@@ -1525,6 +1649,115 @@ const buildHajjModules = (items) =>
         `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
         ["🕋","🧳","🌙"][idx % 3],
         `Hajj guide lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const aqidahTahawiLessonTitle = ({ index, sourceTitle }) => {
+  const raw = cleanSourceTitle(sourceTitle);
+  const part = raw.match(/Part\s*0?(\d+)/i);
+  const topic = raw
+    .replace(/Aqidah At-?Tahawi/i, "")
+    .replace(/Al Aqidah Al Tahawiyyah/i, "")
+    .replace(/\[Part\s*\d+\]/i, "")
+    .replace(/Part\s*\d+/i, "")
+    .replace(/\|\s*Asrar Rashid.*$/i, "")
+    .replace(/^-+|-+$/g, "")
+    .trim();
+  return `Lesson ${pad(index)} - ${topic || `Aqidah At-Tahawi${part ? ` Part ${part[1]}` : ""}`}`;
+};
+const buildAqidahTahawiModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 4)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l27${pad(item.index)}`,
+        aqidahTahawiLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 2,
+          desc: "Imported from the Aqidah At-Tahawi playlist by Asrar Rashid.",
+        }
+      ));
+
+      return mkModule(
+        `m27${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["☝️","🕌","📚","✨"][idx % 4],
+        `Aqidah At-Tahawi lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const hifzLessonTitle = ({ index, sourceTitle }) => {
+  const raw = cleanSourceTitle(sourceTitle);
+  const lesson = raw.match(/Lesson\s*0?(\d+)/i);
+  const topic = raw
+    .replace(/Hifz Quran Online/gi, "")
+    .replace(/Live Hifz ul Quran/gi, "")
+    .replace(/Lesson\s*\d+/gi, "")
+    .replace(/Memorize Quran/gi, "")
+    .replace(/Learn Quran Online/gi, "")
+    .replace(/in Urdu\/Hindi/gi, "")
+    .replace(/-+\s*eQuranAcademy.*/gi, "")
+    .replace(/@[\w]+/g, "")
+    .replace(/^[\s\-|:/]+|[\s\-|:/]+$/g, "")
+    .trim();
+  return `Lesson ${pad(index)} - ${topic || `Hifz Quran${lesson ? ` Lesson ${lesson[1]}` : ""}`}`;
+};
+const buildHifzQuranModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 8)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l29${pad(item.index)}`,
+        hifzLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 2,
+          desc: "Imported from the Hifz Quran Urdu/Hindi playlist.",
+        }
+      ));
+
+      return mkModule(
+        `m29${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["🧠","📖","🌙","✨"][idx % 4],
+        `Hifz Quran lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
+const reciteProperlyLessonTitle = ({ index, sourceTitle }) => {
+  const raw = cleanSourceTitle(sourceTitle);
+  const page = raw.match(/Page\s*(\d+)/i);
+  return `Lesson ${pad(index)} - ${page ? `Juz 1 Page ${page[1]}` : raw.replace(/How to recite the Quran in the proper way/gi, "").trim() || "Recite Quran Properly"}`;
+};
+const buildReciteQuranProperlyModules = (items) =>
+  chunk([...items].sort((a, b) => a.index - b.index), 5)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l30${pad(item.index)}`,
+        reciteProperlyLessonTitle(item),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= 2,
+          desc: "Imported from the Recite Quran Properly playlist.",
+        }
+      ));
+
+      return mkModule(
+        `m30${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["📖","🎙️","🧭","✨"][idx % 4],
+        `Recitation practice lessons ${start} to ${end}.`,
         lessons
       );
     })
@@ -1718,17 +1951,124 @@ const COURSES = [
     modules:buildPropheticParentingModules(PROPHETIC_PARENTING_PLAYLIST_ITEMS),
   },
   {
-    id:6, slug:"learn-qaida",
-    title:"Qaida Course", titleAr:"دورة القاعدة",
+    id:31, slug:"noorani-qaida",
+    title:"Noorani Qaida", titleAr:"القاعدة النورانية",
     instructor:"Nur Academy Qaida Faculty", category:"Quran", level:"Beginner",
-    rating:4.9, students:5960, price:0, isFree:true,
-    badge:"3 Paths", badgeC:C.gold,
-    thumb:"🌟", color:C.em,
-    desc:"Choose the Madani Qaida, full Noorani Qaida, or shorter Noorani Basics route. All three tracks now use the linked YouTube playlists directly inside one Qaida course card.",
-    playlist:QAIDA_TRACKS.madani.playlist,
-    defaultTrack:QAIDA_DEFAULT_TRACK,
-    trackOptions:QAIDA_TRACKS,
-    modules:QAIDA_TRACKS.madani.modules,
+    rating:4.9, students:3640, price:0, isFree:true,
+    badge:"2 Options", badgeC:C.gold,
+    thumb:"🌙", color:"#0F6B52",
+    desc:"A Noorani Qaida learning path with two study options inside one card: the full Noorani Qaida route and the shorter Noorani Basics route.",
+    playlist:NOORANI_QAIDA_TRACKS.nooraniClassic.playlist,
+    defaultTrack:NOORANI_QAIDA_DEFAULT_TRACK,
+    trackOptions:NOORANI_QAIDA_TRACKS,
+    modules:NOORANI_QAIDA_TRACKS.nooraniClassic.modules,
+  },
+  {
+    id:32, slug:"madani-qaida",
+    title:"Madani Qaida", titleAr:"القاعدة المدنية",
+    instructor:"Nur Academy Qaida Faculty", category:"Quran", level:"Beginner",
+    rating:4.9, students:3380, price:0, isFree:true,
+    badge:"2 Options", badgeC:C.gold,
+    thumb:"📗", color:"#2F6F4F",
+    desc:"A Madani Qaida card with two separate routes inside it: Madani Qaida Journey and Madani Qaida Classic.",
+    playlist:MADANI_QAIDA_TRACKS.madaniJourney.playlist,
+    defaultTrack:MADANI_QAIDA_DEFAULT_TRACK,
+    trackOptions:MADANI_QAIDA_TRACKS,
+    modules:MADANI_QAIDA_TRACKS.madaniJourney.modules,
+  },
+  {
+    id:33, slug:"arabic-learning-path",
+    title:"Arabic Learning Path", titleAr:"مسار تعلم العربية",
+    instructor:"Nur Academy Arabic Faculty", category:"Arabic", level:"Beginner",
+    rating:4.9, students:2860, price:0, isFree:true,
+    badge:"2 Tracks", badgeC:C.gold,
+    thumb:"🧭", color:"#355C7D",
+    desc:"A dual-track Arabic studies card with Al Arabiyya Bayna Yadayk for full Arabic learning and Al Ajooroomiyya for focused grammar study.",
+    playlist:ARABIC_LEARNING_PATH_TRACKS.arabiyyaBaynaYadayk.playlist,
+    defaultTrack:ARABIC_LEARNING_PATH_DEFAULT_TRACK,
+    trackOptions:ARABIC_LEARNING_PATH_TRACKS,
+    modules:ARABIC_LEARNING_PATH_TRACKS.arabiyyaBaynaYadayk.modules,
+  },
+  {
+    id:26, slug:"aqidah-at-tahawi",
+    title:"Aqidah At-Tahawi", titleAr:"العقيدة الطحاوية",
+    instructor:"Asrar Rashid", category:"Aqidah", level:"Intermediate",
+    rating:4.9, students:1860, price:0, isFree:true,
+    badge:"Aqidah", badgeC:C.gold,
+    thumb:"☝️", color:"#425B76",
+    desc:"A structured Aqidah At-Tahawi course covering creed, divine attributes, decree, prophethood, and core Sunni belief foundations.",
+    playlist:AQIDAH_NEW_PLAYLIST_ID,
+    modules:buildAqidahTahawiModules(AQIDAH_NEW_PLAYLIST_ITEMS),
+  },
+  {
+    id:27, slug:"hajj-course",
+    title:"Hajj Course", titleAr:"دورة الحج",
+    instructor:"Zaid Patel", category:"Fiqh", level:"Beginner",
+    rating:4.8, students:1730, price:0, isFree:true,
+    badge:"Hajj", badgeC:C.gold,
+    thumb:"🕋", color:"#4E6C5D",
+    desc:"A step-by-step Hajj guide covering preparation, ihram, major rites, and common practical questions through the full playlist.",
+    playlist:HAJJ_PLAYLIST_ID,
+    modules:buildHajjModules(HAJJ_PLAYLIST_ITEMS),
+  },
+  {
+    id:28, slug:"hifz-quran",
+    title:"Hifz Quran", titleAr:"حفظ القرآن",
+    instructor:"eQuranAcademy", category:"Quran", level:"Intermediate",
+    rating:4.9, students:2140, price:0, isFree:true,
+    badge:"Hifz", badgeC:C.gold,
+    thumb:"🧠", color:"#355C4D",
+    desc:"A large Urdu/Hindi Hifz pathway for memorising short surahs, revision lessons, and extended hifz practice from the linked playlist.",
+    playlist:HIFZ_QURAN_PLAYLIST_ID,
+    modules:buildHifzQuranModules(HIFZ_QURAN_PLAYLIST_ITEMS),
+  },
+  {
+    id:29, slug:"recite-quran-properly",
+    title:"Recite Quran Properly", titleAr:"اقرأ القرآن بإتقان",
+    instructor:"Alaa Elsayed", category:"Quran", level:"Beginner",
+    rating:4.8, students:1470, price:0, isFree:true,
+    badge:"Recitation", badgeC:C.gold,
+    thumb:"🎙️", color:"#2C5D74",
+    desc:"A guided recitation practice course focused on reading the Quran correctly page by page with slow, clear demonstration.",
+    playlist:RECITE_QURAN_PROPERLY_PLAYLIST_ID,
+    modules:buildReciteQuranProperlyModules(RECITE_QURAN_PROPERLY_PLAYLIST_ITEMS),
+  },
+  {
+    id:30, slug:"complete-namaz-with-tajweed",
+    title:"Complete Namaz with Tajweed", titleAr:"النماز مع التجويد",
+    instructor:"Nur Academy",
+    category:"Quran",
+    level:"Beginner",
+    rating:4.8,
+    students:980,
+    price:0,
+    isFree:true,
+    badge:"Short Course",
+    badgeC:C.gold,
+    thumb:"🤲",
+    color:"#6A5740",
+    desc:"A short practical lesson for learning the complete namaz recitation with proper tajweed.",
+    playlist:"",
+    modules:[
+      mkModule(
+        "m30na",
+        "Module 1 - Namaz Recitation",
+        "🤲",
+        "One focused lesson for complete namaz recitation with tajweed.",
+        [
+          mkLesson(
+            "l30na1",
+            "Lesson 01 - Complete Namaz with Tajweed",
+            "EBmgv8Z25Mc",
+            "15:00",
+            {
+              free: true,
+              desc: "Imported from the YouTube lesson you shared for complete namaz with tajweed.",
+            }
+          ),
+        ]
+      ),
+    ],
   },
   {
     id:7, slug:"usool-e-hadith",
@@ -1767,28 +2107,6 @@ const COURSES = [
       lessonDesc: "Imported from the Sahih Muslim Urdu translation playlist.",
       icons: ["📗","📙","📕","📘","📚","✨","🕯️","🏁"],
     }),
-  },
-  {
-    id:9, slug:"islamic-basics",
-    title:"Islamic Basics", titleAr:"أساسيات الإسلام",
-    instructor:"Think Arabic", category:"Fiqh", level:"Beginner",
-    rating:4.8, students:6100, price:0, isFree:true,
-    badge:"Beginner", badgeC:C.gold,
-    thumb:"☪️", color:C.em,
-    desc:"A beginner-friendly YouTube course covering Islamic beliefs, conversion, purification, the five daily prayers, first mosque steps, and essential recitations for new learners.",
-    playlist:ISLAMIC_BASICS_PLAYLIST_ID,
-    modules:buildIslamicBasicsModules(ISLAMIC_BASICS_PLAYLIST_ITEMS),
-  },
-  {
-    id:15, slug:"insurance-rulings",
-    title:"Insurance Rulings", titleAr:"أحكام التأمين",
-    instructor:"Sheikh Aziz bin Farhan Al Anizi", category:"Fiqh", level:"Intermediate",
-    rating:4.8, students:920, price:0, isFree:true,
-    badge:"Fiqh", badgeC:C.gold,
-    thumb:"🛡️", color:"#4C6A5A",
-    desc:"A concise fiqh mini-course answering common questions about car insurance, extended warranties, garage claim differences, and fully comprehensive cover.",
-    playlist:INSURANCE_PLAYLIST_ID,
-    modules:buildInsuranceModules(INSURANCE_PLAYLIST_ITEMS),
   },
 ];
 const applyTrackToModules = (modules=[], lessonOverrides={}, moduleOverrides={}) => modules.map(mod => {
@@ -2113,6 +2431,41 @@ const flatLessons = (course) => {
   course.modules.forEach((mod, mi) => mod.lessons.forEach((ls, li) => out.push({ ...ls, mi, li })));
   return out;
 };
+const clampCourseIndex = (value, length) => {
+  if (!length || length < 1) return 0;
+  const num = safeNum(value, 0);
+  return Math.max(0, Math.min(length - 1, num));
+};
+const lessonStatePosition = (course, lessonState={}) => {
+  if (!course) return { mi: 0, li: 0 };
+
+  const lookupId = String(lessonState?.lessonId || "").trim();
+  if (lookupId) {
+    const match = flatLessons(course).find(lesson => lesson.id === lookupId);
+    if (match) return { mi: match.mi, li: match.li };
+  }
+
+  const mi = clampCourseIndex(lessonState?.mi, course.modules.length);
+  const mod = course.modules[mi];
+  const li = clampCourseIndex(lessonState?.li, mod?.lessons?.length || 0);
+  return { mi, li };
+};
+const createLessonState = (courseLike, mi=0, li=0) => {
+  const course = resolveCourse(courseLike);
+  if (!course || !course.modules?.length) return null;
+
+  const nextPosition = lessonStatePosition(course, { mi, li });
+  const lesson = course.modules[nextPosition.mi]?.lessons?.[nextPosition.li] || null;
+  return {
+    course,
+    courseId: course.id,
+    courseSlug: course.slug,
+    selectedTrackKey: course.selectedTrackKey || null,
+    lessonId: lesson?.id || null,
+    mi: nextPosition.mi,
+    li: nextPosition.li,
+  };
+};
 const totalLessons = (c) => c.modules.reduce((a,m) => a+m.lessons.length, 0);
 const namespaceModules = (modules=[], prefix="") => {
   if (!prefix) return modules;
@@ -2350,7 +2703,8 @@ const requestYouTubeDuration = (videoId) => {
   ytDurationRequests.set(id, request);
   return request;
 };
-const useResolvedLessonDuration = (videoId, fallback="") => {
+const useResolvedLessonDuration = (videoId, fallback="", options={}) => {
+  const { allowProbe = !fallback } = options;
   const id = getYtId(videoId);
   const fallbackLabel = fallback || "Unavailable";
   const [duration, setDuration] = useState(() => {
@@ -2367,6 +2721,8 @@ const useResolvedLessonDuration = (videoId, fallback="") => {
     const cached = readYouTubeDurationCache()[id];
     if (cached) setDuration(cached);
     else setDuration(fallbackLabel);
+
+    if (!allowProbe) return;
 
     let cancelled = false;
     const handleDuration = (event) => {
@@ -2386,12 +2742,12 @@ const useResolvedLessonDuration = (videoId, fallback="") => {
       cancelled = true;
       window.removeEventListener(YT_DURATION_EVENT, handleDuration);
     };
-  }, [fallbackLabel, id]);
+  }, [allowProbe, fallbackLabel, id]);
 
   return duration || fallbackLabel;
 };
-const LessonDurationText = ({ videoId, fallback, style={} }) => {
-  const duration = useResolvedLessonDuration(videoId, fallback);
+const LessonDurationText = ({ videoId, fallback, style={}, allowProbe }) => {
+  const duration = useResolvedLessonDuration(videoId, fallback, { allowProbe });
   return <span style={style}>⏱ {duration}</span>;
 };
 
@@ -2431,6 +2787,7 @@ const openCertificatePrintWindow = (course, user, completion) => {
   const popup = window.open("", "_blank", "noopener,noreferrer,width=1100,height=780");
   if (!popup) return;
   const logoSrc = new URL(BRAND_LOGO_SRC, window.location.href).href;
+  const sealSrc = new URL(sealImage, window.location.href).href;
   const signatureSrc = new URL(signatureImage, window.location.href).href;
   const studentName = escapeHtml(user.name);
   const courseTitle = escapeHtml(course.selectedTrackLabel ? `${course.title} (${course.selectedTrackLabel} Track)` : course.title);
@@ -2487,11 +2844,14 @@ const openCertificatePrintWindow = (course, user, completion) => {
       .seal-inner{width:86px;height:86px;border-radius:50%;border:2px solid rgba(255,255,255,.65);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#533707;padding:8px}
       .seal-inner span,.seal-inner small{text-transform:uppercase;letter-spacing:.16em;font-size:8px;line-height:1.4}
       .seal-inner strong{font-size:16px;margin:4px 0;line-height:1.05}
-      .footer{margin-top:18px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end}
+      .footer{margin-top:18px;display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:end}
       .signature-block{max-width:320px}
       .signature-block img{height:42px;object-fit:contain;display:block;margin-bottom:6px}
       .signature-line{height:1px;background:#0b5240}
       .signature-label{margin-top:6px;color:#5e584b;font-size:10px;text-transform:uppercase;letter-spacing:.18em}
+      .official-seal{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:90px}
+      .official-seal img{width:80px;height:auto;object-fit:contain;display:block;filter:drop-shadow(0 10px 18px rgba(120,33,33,.16));margin-bottom:6px}
+      .official-seal-label{color:#7b6650;font-size:10px;text-transform:uppercase;letter-spacing:.16em;text-align:center}
       .foot-copy{text-align:right;color:#645d52;font-size:10px;line-height:1.55;max-width:240px}
       .foot-copy strong{display:block;color:#0b5240;font-size:14px;margin-bottom:4px}
       @media (max-width: 900px){
@@ -2561,6 +2921,10 @@ const openCertificatePrintWindow = (course, user, completion) => {
               <img src="${signatureSrc}" alt="Instructor signature" />
               <div class="signature-line"></div>
               <div class="signature-label">Authorized Instructor</div>
+            </div>
+            <div class="official-seal">
+              <img src="${sealSrc}" alt="Nur Academy official seal" />
+              <div class="official-seal-label">Official Seal</div>
             </div>
             <div class="foot-copy">
               <strong>Issued by Nur Academy</strong>
@@ -2702,11 +3066,8 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
   const [fallback, setFallback] = useState(false);
   const [playerError, setPlayerError] = useState(null);
   const watchUrl = id ? `https://www.youtube.com/watch?v=${id}${playlistId ? `&list=${playlistId}` : ""}` : "#";
-  const embedOrigin = typeof window !== "undefined" && window.location?.origin
-    ? `&origin=${encodeURIComponent(window.location.origin)}`
-    : "";
-  const embedSrc = id
-    ? `https://www.youtube.com/embed/${id}?enablejsapi=1&rel=0&modestbranding=1&playsinline=1${playlistId ? `&list=${encodeURIComponent(playlistId)}` : ""}${embedOrigin}`
+  const fallbackEmbedSrc = id
+    ? `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1`
     : "";
 
   useEffect(() => {
@@ -2786,7 +3147,6 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
           rel: 0,
           modestbranding: 1,
           playsinline: 1,
-          ...(playlistId ? { listType: "playlist", list: playlistId } : {}),
           ...(typeof window !== "undefined" && window.location?.origin
             ? { origin: window.location.origin }
             : {}),
@@ -2894,7 +3254,7 @@ const YTPlayer = ({ videoId, title, playlistId, initialWatchSeconds=0, onWatchPr
     return (
       <iframe
         style={{width:"100%",height:"100%",border:"none",display:"block"}}
-        src={embedSrc}
+        src={fallbackEmbedSrc}
         title={title}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
@@ -3029,6 +3389,10 @@ const CourseCard = ({ course, onClick }) => {
 const ModuleList = ({ course, doneIds, isEnrolled, onLesson, curId }) => {
   const [open, setOpen] = useState([course.modules[0]?.id]);
   const tog = (id) => setOpen(p => p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+
+  useEffect(() => {
+    setOpen(course.modules[0]?.id ? [course.modules[0].id] : []);
+  }, [course.id, course.selectedTrackKey]);
 
   return (
     <div>
@@ -3217,7 +3581,7 @@ const Footer = () => (
           </div>
         </div>
         {[
-          {t:"Courses",ls:["Tajweed ul Qira'at","Qaida Course","Short Seerah","Arabic Grammar","Islamic Basics"]},
+          {t:"Courses",ls:["Tajweed ul Qira'at","Noorani Qaida","Madani Qaida","Aqidah At-Tahawi","Hifz Quran"]},
           {t:"Platform",ls:["About Us","Instructors","Blog","Contact","Certificates"]},
           {t:"Support", ls:["Help Center","Community","Privacy Policy","Terms"]},
         ].map(col=>(
@@ -3488,7 +3852,9 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
 
   const handleLesson = (mi, li) => {
     if (!loggedIn) { setPage("login"); return; }
-    setLesson({ course: courseData, mi, li }); setPage("lesson");
+    const nextLessonState = createLessonState(courseData, mi, li);
+    if (!nextLessonState) return;
+    setLesson(nextLessonState); setPage("lesson");
   };
 
   const curId = null;
@@ -3573,7 +3939,13 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
             ) : (
               <div>
                 {popped&&<div style={{textAlign:"center",fontSize:"1.3rem",marginBottom:7,animation:"pop .4s ease"}}>🎉 Enrolled!</div>}
-                <Btn v="primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{ if (!nextLesson) return; setLesson({course:courseData,mi:nextLesson.mi,li:nextLesson.li});setPage("lesson"); }}>
+                <Btn v="primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{
+                  if (!nextLesson) return;
+                  const nextLessonState = createLessonState(courseData, nextLesson.mi, nextLesson.li);
+                  if (!nextLessonState) return;
+                  setLesson(nextLessonState);
+                  setPage("lesson");
+                }}>
                   ▶ Resume Course
                 </Btn>
                 <div style={{marginTop:9}}><PBar value={pct} label={`${pct}% complete`}/></div>
@@ -3652,21 +4024,33 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
 
 // ─── LESSON PLAYER ────────────────────────────────────────────────────────────
 const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
-  const sourceCourse = resolveCourse(lessonData?.course);
-  const { mi: initMi, li: initLi } = lessonData || {};
-  const [mi,       setMi      ] = useState(initMi||0);
-  const [li,       setLi      ] = useState(initLi||0);
+  const sourceCourse = resolveCourse({
+    ...(lessonData?.course || {}),
+    id: lessonData?.courseId ?? lessonData?.course?.id,
+    slug: lessonData?.courseSlug || lessonData?.course?.slug,
+    selectedTrackKey: lessonData?.selectedTrackKey || lessonData?.course?.selectedTrackKey || null,
+  });
+  const initialPosition = lessonStatePosition(sourceCourse, lessonData);
+  const [mi,       setMi      ] = useState(initialPosition.mi);
+  const [li,       setLi      ] = useState(initialPosition.li);
   const [sTab,     setSTab    ] = useState("chapters");
   const [doneIds,  setDoneIds ] = useState(DB.progress(sourceCourse?.id));
   const [confetti, setConfetti] = useState(false);
-  const [watchInfo, setWatchInfo] = useState(sourceCourse ? DB.watch(sourceCourse.id, sourceCourse.modules[initMi||0]?.lessons[initLi||0]?.id) : defaultWatchState());
-  const [trackingSupported, setTrackingSupported] = useState(Boolean(getYtId(sourceCourse?.modules[initMi||0]?.lessons[initLi||0]?.youtubeId)));
+  const [watchInfo, setWatchInfo] = useState(sourceCourse ? DB.watch(sourceCourse.id, sourceCourse.modules[initialPosition.mi]?.lessons[initialPosition.li]?.id) : defaultWatchState());
+  const [trackingSupported, setTrackingSupported] = useState(Boolean(getYtId(sourceCourse?.modules[initialPosition.mi]?.lessons[initialPosition.li]?.youtubeId)));
   const [courseCompleted, setCourseCompleted] = useState(null);
   const [certificateGate, setCertificateGate] = useState(null);
   const [gateDismissed, setGateDismissed] = useState(false);
   const completeTimer = useRef(null);
   const completionTriggered = useRef(false);
   const course = sourceCourse;
+
+  useEffect(() => {
+    if (!sourceCourse) return;
+    const nextPosition = lessonStatePosition(sourceCourse, lessonData);
+    setMi(nextPosition.mi);
+    setLi(nextPosition.li);
+  }, [lessonData?.courseId, lessonData?.courseSlug, lessonData?.lessonId, lessonData?.selectedTrackKey, sourceCourse?.id, sourceCourse?.selectedTrackKey]);
 
   if (!course) return null;
 
@@ -3683,6 +4067,7 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
   const lessonWatchPct = Math.max(0, watchInfo.percent || 0);
   const watchStats = courseWatchStats(course);
   const certificateReady = Boolean(DB.courseCompletion(course.id));
+  const adminCertificateBypass = Auth.isAdmin();
 
   useEffect(() => {
     if (!course || !curLs) return;
@@ -3721,7 +4106,7 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
     }
 
     const nextWatchStats = courseWatchStats(course);
-    if (!nextWatchStats.eligible) {
+    if (!adminCertificateBypass && !nextWatchStats.eligible) {
       setCertificateGate(nextWatchStats);
       return null;
     }
@@ -3729,7 +4114,7 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
     setCertificateGate(null);
     setGateDismissed(false);
     return DB.finishCourse(course.id, { watchPercent: nextWatchStats.averagePct });
-  }, [course, tot]);
+  }, [adminCertificateBypass, course, tot]);
   const markLessonComplete = useCallback((lesson) => {
     if (!course || !lesson) return;
     const currentProgress = DB.progress(course.id);
@@ -3810,7 +4195,7 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
     <div style={{paddingTop:64,background:"#0C0C0C",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
       {/* Top bar */}
       <div className="lesson-topbar" style={{background:C.emD,padding:"8px 18px",display:"flex",alignItems:"center",gap:11,borderBottom:"1px solid rgba(255,255,255,.06)",flexShrink:0}}>
-        <button onClick={()=>setPage("course-detail")} style={{background:"none",border:"none",color:"rgba(255,255,255,.52)",cursor:"pointer",fontSize:".78rem",fontFamily:"'Nunito Sans',sans-serif",flexShrink:0}}>← Back</button>
+        <button onClick={()=>{ setCourse(course); setPage("course-detail"); }} style={{background:"none",border:"none",color:"rgba(255,255,255,.52)",cursor:"pointer",fontSize:".78rem",fontFamily:"'Nunito Sans',sans-serif",flexShrink:0}}>← Back</button>
         <span style={{color:"rgba(255,255,255,.18)"}}>|</span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{color:"white",fontSize:".82rem",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{course.title}</div>
@@ -3886,7 +4271,9 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
                     : "YouTube tracking is unavailable on this device right now, so a manual completion fallback is shown below."}
                 </div>
                 <div style={{marginTop:7,fontSize:".7rem",color:"rgba(255,255,255,.48)"}}>
-                  Certificate unlock: {watchStats.averagePct}% total watch time. At least {CERTIFICATE_WATCH_THRESHOLD}% is required.
+                  {adminCertificateBypass
+                    ? `Admin preview mode is active on this account. Certificates can be issued after all lessons are marked complete, even below ${CERTIFICATE_WATCH_THRESHOLD}% watch time.`
+                    : `Certificate unlock: ${watchStats.averagePct}% total watch time. At least ${CERTIFICATE_WATCH_THRESHOLD}% is required.`}
                 </div>
               </div>
             ) : (
@@ -3896,7 +4283,7 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
                   : "This lesson is not currently available for in-site playback, so manual completion is shown instead."}
               </div>
             )}
-            {!certificateReady && certificateGate && (
+            {!certificateReady && certificateGate && !adminCertificateBypass && (
               <div style={{marginBottom:12,padding:"11px 12px",borderRadius:10,background:"rgba(220,38,38,.12)",border:"1px solid rgba(220,38,38,.28)",fontSize:".74rem",color:"rgba(255,255,255,.76)",lineHeight:1.65}}>
                 All lectures are marked complete, but the certificate is still locked until the learner reaches at least {CERTIFICATE_WATCH_THRESHOLD}% total watch time. Current watch time: <strong style={{color:"white"}}>{certificateGate.averagePct}%</strong>.
               </div>
@@ -4177,11 +4564,18 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
     {icon:"👤",l:"Profile",k:"profile"},
   ];
 
-  const openLesson = (c) => { setLesson({course:c,mi:0,li:0}); setPage("lesson"); };
+  const openLesson = (c) => {
+    const nextLessonState = createLessonState(c, 0, 0);
+    if (!nextLessonState) return;
+    setLesson(nextLessonState);
+    setPage("lesson");
+  };
   const openSpecificLesson = (course, mod, lesson) => {
     const mi = course.modules.indexOf(mod);
     const li = mod.lessons.indexOf(lesson);
-    setLesson({ course, mi, li });
+    const nextLessonState = createLessonState(course, mi, li);
+    if (!nextLessonState) return;
+    setLesson(nextLessonState);
     setPage("lesson");
   };
   const handleCopyId = async (certificateId) => {
@@ -4421,7 +4815,11 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
               <div style={{background:"white",borderRadius:12,padding:32,textAlign:"center",border:`1px solid ${C.border}`}}>
                 <div style={{fontSize:"2.3rem",marginBottom:11}}>🏆</div>
                 <div style={{fontWeight:600,marginBottom:5}}>No certificates yet</div>
-                <div style={{fontSize:".8rem",color:C.textL}}>Finish the lessons and reach at least {CERTIFICATE_WATCH_THRESHOLD}% watch time in a course to unlock a printable certificate.</div>
+                <div style={{fontSize:".8rem",color:C.textL}}>
+                  {currentUser?.role === "admin"
+                    ? "Finish the lessons in a course to unlock a printable certificate on this admin preview account."
+                    : `Finish the lessons and reach at least ${CERTIFICATE_WATCH_THRESHOLD}% watch time in a course to unlock a printable certificate.`}
+                </div>
               </div>
             ) : (
               <>
@@ -5427,7 +5825,7 @@ const AdminPage = ({ setPage, currentUser }) => {
               <div style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
                 <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:10}}>Courses That Can Issue Certificates</div>
                 <div style={{fontSize:".76rem",lineHeight:1.65,color:"#6B7280",marginBottom:12}}>
-                  Every listed course below uses the same certificate flow. A certificate is issued after all lessons are completed and the learner reaches at least {CERTIFICATE_WATCH_THRESHOLD}% watch time on supported videos.
+                  Every listed course below uses the same certificate flow. Students must finish all lessons and reach at least {CERTIFICATE_WATCH_THRESHOLD}% watch time on supported videos. On the current admin account, that watch-time rule is bypassed so you can preview certificates after marking lessons complete.
                 </div>
                 <div style={{display:"grid",gap:8}}>
                   {adminCertificateStatus.map(item => (
@@ -5441,7 +5839,7 @@ const AdminPage = ({ setPage, currentUser }) => {
               <div style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
                 <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:10}}>Current Admin Account</div>
                 <div style={{fontSize:".78rem",lineHeight:1.65,color:"#6B7280",marginBottom:12}}>
-                  Signed in as <strong style={{color:"#1A1A2E"}}>{currentUser.email}</strong>. Issued certificates for this account on this browser: <strong style={{color:"#1A1A2E"}}>{adminIssuedCertificates.length}</strong>.
+                  Signed in as <strong style={{color:"#1A1A2E"}}>{currentUser.email}</strong>. Issued certificates for this account on this browser: <strong style={{color:"#1A1A2E"}}>{adminIssuedCertificates.length}</strong>. This admin session can bypass the watch-time rule for certificate preview.
                 </div>
                 <div style={{display:"grid",gap:8}}>
                   {adminIssuedCertificates.length === 0 ? (

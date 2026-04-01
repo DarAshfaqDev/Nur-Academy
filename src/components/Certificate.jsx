@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import QRCode from "react-qr-code";
+import sealImage from "../assets/nur_seal.png";
 import signatureImage from "../assets/signature-optimized.png";
 import HadiyaSupportCard from "./HadiyaSupportCard";
 
@@ -492,7 +493,7 @@ function Certificate({ user, course, completion, onPrint }) {
         .certificate-footer {
           margin-top: 34px;
           display: grid;
-          grid-template-columns: 1fr auto auto;
+          grid-template-columns: 1fr auto auto auto;
           gap: 22px;
           align-items: end;
         }
@@ -519,6 +520,31 @@ function Certificate({ user, course, completion, onPrint }) {
           font-size: 0.74rem;
           text-transform: uppercase;
           letter-spacing: 0.18em;
+        }
+
+        .certificate-stamp {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: end;
+          min-width: 116px;
+        }
+
+        .certificate-stamp img {
+          width: 108px;
+          height: auto;
+          object-fit: contain;
+          display: block;
+          filter: drop-shadow(0 12px 20px rgba(120, 33, 33, 0.16));
+          margin-bottom: 8px;
+        }
+
+        .certificate-stamp-label {
+          color: #7b6650;
+          font-size: 0.72rem;
+          text-transform: uppercase;
+          letter-spacing: 0.16em;
+          text-align: center;
         }
 
         .certificate-qr-card {
@@ -590,6 +616,10 @@ function Certificate({ user, course, completion, onPrint }) {
             max-width: none;
           }
 
+          .certificate-stamp {
+            min-width: 0;
+          }
+
           .certificate-foot-copy {
             text-align: left;
             max-width: none;
@@ -641,6 +671,10 @@ function Certificate({ user, course, completion, onPrint }) {
           .certificate-seal-inner {
             width: 102px;
             height: 102px;
+          }
+
+          .certificate-stamp img {
+            width: 96px;
           }
 
           .certificate-qr-card {
@@ -797,7 +831,13 @@ function Certificate({ user, course, completion, onPrint }) {
             margin-bottom: 6px;
           }
 
+          .certificate-stamp img {
+            width: 82px;
+            margin-bottom: 4px;
+          }
+
           .certificate-signature-label,
+          .certificate-stamp-label,
           .certificate-qr-card span,
           .certificate-foot-copy {
             font-size: 10px;
@@ -892,6 +932,11 @@ function Certificate({ user, course, completion, onPrint }) {
               <img src={signatureImage} alt="Instructor signature" />
               <div className="certificate-signature-line" />
               <div className="certificate-signature-label">Authorized Instructor</div>
+            </div>
+
+            <div className="certificate-stamp">
+              <img src={sealImage} alt="Nur Academy official seal" />
+              <div className="certificate-stamp-label">Official Seal</div>
             </div>
 
             <div className="certificate-qr-card">
