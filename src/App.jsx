@@ -2,7 +2,8 @@ import CertificatePage, { exportCertificatePdf } from "./components/CertificateP
 import { Component, useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import sealImage from "./assets/nur_seal.png";
-import signatureImage from "./assets/signature-optimized.png";
+import signatureImage from "./assets/signature.png";
+import { supabase } from "./lib/supabase";
 import HadiyaSupportCard from "./components/HadiyaSupportCard";
 import { AASAN_ARABIC_GRAMMAR_PLAYLIST_ID, AASAN_ARABIC_GRAMMAR_PLAYLIST_ITEMS } from "./data/aasanArabicGrammarPlaylist";
 import { AQIDAH_ENGLISH_PLAYLIST_ID, AQIDAH_ENGLISH_PLAYLIST_ITEMS } from "./data/aqidahEnglishPlaylist";
@@ -19,6 +20,11 @@ import { ILM_UN_NAHW_PLAYLIST_ID, ILM_UN_NAHW_PLAYLIST_ITEMS } from "./data/ilmU
 import { ILM_US_SARF_PLAYLIST_ID, ILM_US_SARF_PLAYLIST_ITEMS } from "./data/ilmUsSarfPlaylist";
 import { ISLAMIC_BASICS_PLAYLIST_ID, ISLAMIC_BASICS_PLAYLIST_ITEMS } from "./data/islamicBasicsPlaylist";
 import { MADANI_QAIDA_PLAYLIST_ID, MADANI_QAIDA_PLAYLIST_ITEMS } from "./data/madaniQaidaPlaylist";
+import { MADINAH_ARABIC_BOOK_2_ENGLISH_PLAYLIST_ID, MADINAH_ARABIC_BOOK_2_ENGLISH_PLAYLIST_ITEMS } from "./data/madinahArabicBook2EnglishPlaylist";
+import { MADINAH_ARABIC_BOOK_1_URDU_PLAYLIST_ID, MADINAH_ARABIC_BOOK_1_URDU_PLAYLIST_ITEMS } from "./data/madinahArabicBook1UrduPlaylist";
+import { MADINAH_ARABIC_BOOK_2_URDU_PLAYLIST_ID, MADINAH_ARABIC_BOOK_2_URDU_PLAYLIST_ITEMS } from "./data/madinahArabicBook2UrduPlaylist";
+import { MADINAH_ARABIC_BOOK_3_URDU_PLAYLIST_ID, MADINAH_ARABIC_BOOK_3_URDU_PLAYLIST_ITEMS } from "./data/madinahArabicBook3UrduPlaylist";
+import { MADINAH_ARABIC_ENGLISH_PLAYLIST_ID, MADINAH_ARABIC_ENGLISH_PLAYLIST_ITEMS } from "./data/madinahArabicEnglishPlaylist";
 import { MUSLIM_SHARIF_PLAYLIST_ID, MUSLIM_SHARIF_PLAYLIST_ITEMS } from "./data/muslimSharifPlaylist";
 import { MUALIM_UL_QURAN_PLAYLIST_ID, MUALIM_UL_QURAN_PLAYLIST_ITEMS } from "./data/mualimUlQuranPlaylist";
 import { NOORANI_QAIDA_A_PLAYLIST_ID, NOORANI_QAIDA_A_PLAYLIST_ITEMS } from "./data/nooraniQaidaAPlaylist";
@@ -208,6 +214,7 @@ const K = {
   SESSION: "nur_session_v2",
   DATA: "nur_data_v2",
   COURSES: "nur_courses_v1",
+  SUPPORT: "nur_support_v1",
   YT_DURATIONS: "nur_youtube_durations_v1",
   LOGIN_EMAIL: "nur_login_email_v1",
 };
@@ -215,6 +222,7 @@ const clearNurBrowserData = () => {
   ls.remove(K.USERS);
   ls.remove(K.SESSION);
   ls.remove(K.DATA);
+  ls.remove(K.SUPPORT);
   ls.remove(K.YT_DURATIONS);
 };
 
@@ -233,6 +241,19 @@ const formatDay = (value, opts={ year:"numeric", month:"long", day:"numeric" }) 
   const date = parseDayKey(value);
   return date ? date.toLocaleDateString("en-US", opts) : "—";
 };
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleString("en-IN", {
+      year:"numeric",
+      month:"short",
+      day:"numeric",
+      hour:"numeric",
+      minute:"2-digit",
+    })
+    : "—";
+};
 const escapeHtml = (value="") => String(value)
   .replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;")
@@ -249,16 +270,144 @@ const safeNum = (value, fallback=0) => {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 };
+const dataUrlBytes = (dataUrl="") => {
+  const parts = String(dataUrl).split(",", 2);
+  const body = parts[1] || "";
+  const padding = (body.match(/=*$/)?.[0].length || 0);
+  return Math.max(0, Math.floor(body.length * 3 / 4) - padding);
+};
+const formatBytes = (bytes=0) => {
+  const size = Math.max(0, safeNum(bytes, 0));
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(size >= 10 * 1024 ? 0 : 1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ""));
+  reader.onerror = () => reject(new Error("The screenshot could not be read on this browser."));
+  reader.readAsDataURL(file);
+});
+const loadImage = (src) => new Promise((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error("The screenshot preview could not be prepared."));
+  image.src = src;
+});
+const SUPPORT_SCREENSHOT_TARGET_MIN_BYTES = 100 * 1024;
+const SUPPORT_SCREENSHOT_TARGET_MAX_BYTES = 150 * 1024;
+const SUPPORT_SCREENSHOT_TARGET_BYTES = 125 * 1024;
+const SUPPORT_SCREENSHOT_MAX_DIMENSION = 1280;
+const SUPPORT_SCREENSHOT_INPUT_ACCEPT = "image/png,image/jpeg,image/webp";
+const renderSupportScreenshotCandidate = (image, maxDimension, quality) => {
+  const longestSide = Math.max(image.naturalWidth || image.width || 1, image.naturalHeight || image.height || 1);
+  const scale = Math.min(1, maxDimension / longestSide);
+  const width = Math.max(1, Math.round((image.naturalWidth || image.width || 1) * scale));
+  const height = Math.max(1, Math.round((image.naturalHeight || image.height || 1) * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("This browser could not process the screenshot.");
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(image, 0, 0, width, height);
+
+  return {
+    width,
+    height,
+    dataUrl: canvas.toDataURL("image/jpeg", quality),
+  };
+};
+const normalizeSupportScreenshot = (raw=null) => {
+  if (!raw || typeof raw !== "object") return null;
+  const dataUrl = String(raw.dataUrl || "").trim();
+  if (!dataUrl.startsWith("data:image/")) return null;
+  return {
+    name: String(raw.name || "support-screenshot.jpg").trim() || "support-screenshot.jpg",
+    type: String(raw.type || "image/jpeg").trim() || "image/jpeg",
+    dataUrl,
+    size: Math.max(0, safeNum(raw.size, dataUrlBytes(dataUrl))),
+    width: Math.max(0, safeNum(raw.width, 0)),
+    height: Math.max(0, safeNum(raw.height, 0)),
+  };
+};
+const prepareSupportScreenshot = async (file) => {
+  if (!file) return null;
+  if (!String(file.type || "").startsWith("image/")) {
+    throw new Error("Please upload a PNG, JPG, or WebP screenshot.");
+  }
+  if (safeNum(file.size, 0) > 8 * 1024 * 1024) {
+    throw new Error("Screenshot is too large. Please choose an image under 8 MB.");
+  }
+
+  const sourceUrl = await fileToDataUrl(file);
+  const image = await loadImage(sourceUrl);
+  const candidateDimensions = [SUPPORT_SCREENSHOT_MAX_DIMENSION, 1180, 1080, 960, 860, 760];
+  const candidateQualities = [0.92, 0.88, 0.84, 0.8, 0.76, 0.72, 0.68, 0.64, 0.6, 0.56, 0.52, 0.48];
+  let bestInRange = null;
+  let bestUnderMax = null;
+  let smallestOverMax = null;
+
+  candidateDimensions.forEach(maxDimension => {
+    candidateQualities.forEach(quality => {
+      const candidate = renderSupportScreenshotCandidate(image, maxDimension, quality);
+      const size = dataUrlBytes(candidate.dataUrl);
+      const scoredCandidate = {
+        ...candidate,
+        size,
+        quality,
+        maxDimension,
+        delta: Math.abs(size - SUPPORT_SCREENSHOT_TARGET_BYTES),
+      };
+
+      if (size >= SUPPORT_SCREENSHOT_TARGET_MIN_BYTES && size <= SUPPORT_SCREENSHOT_TARGET_MAX_BYTES) {
+        if (!bestInRange || scoredCandidate.delta < bestInRange.delta) bestInRange = scoredCandidate;
+        return;
+      }
+
+      if (size <= SUPPORT_SCREENSHOT_TARGET_MAX_BYTES) {
+        if (!bestUnderMax || scoredCandidate.delta < bestUnderMax.delta) bestUnderMax = scoredCandidate;
+        return;
+      }
+
+      if (!smallestOverMax || size < smallestOverMax.size) smallestOverMax = scoredCandidate;
+    });
+  });
+
+  const finalCandidate = bestInRange || bestUnderMax;
+  if (!finalCandidate) {
+    throw new Error(`Screenshot is still too large after compression. Please choose a simpler image under ${formatBytes(SUPPORT_SCREENSHOT_TARGET_MAX_BYTES)}.`);
+  }
+
+  const baseName = String(file.name || "support-screenshot")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^\w.-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "support-screenshot";
+
+  return normalizeSupportScreenshot({
+    name: `${baseName}.jpg`,
+    type: "image/jpeg",
+    dataUrl: finalCandidate.dataUrl,
+    size: finalCandidate.size,
+    width: finalCandidate.width,
+    height: finalCandidate.height,
+  });
+};
 const watchKey = (cid, lid) => `${cid}:${lid}`;
 const getInitials = (name="Nur Student") =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "N";
 const newUserId = () => `u_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
+const newSupportId = () => `SUP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 const defaultStreak = () => ({ count:0, lastDate:null, history:[] });
 const defaultWatchState = () => ({ watchedSeconds:0, duration:0, percent:0, completedAt:null, lastViewedAt:null, source:"watch" });
-const defaultUserState = () => ({ enrollments:[], courseTracks:{}, progress:{}, notes:{}, streak:defaultStreak(), watch:{}, completions:{} });
+const defaultUserState = () => ({ enrollments:[], courseTracks:{}, seriesSelections:{}, progress:{}, notes:{}, streak:defaultStreak(), watch:{}, completions:{} });
 const mergeUserState = (raw={}) => ({
   enrollments: [...(raw.enrollments || [])],
   courseTracks: { ...(raw.courseTracks || {}) },
+  seriesSelections: { ...(raw.seriesSelections || {}) },
   progress: { ...(raw.progress || {}) },
   notes: { ...(raw.notes || {}) },
   streak: { ...defaultStreak(), ...(raw.streak || {}) },
@@ -273,7 +422,12 @@ const hashText = async (value) => {
     const digest = await window.crypto.subtle.digest("SHA-256", bytes);
     return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
   }
-  return btoa(unescape(encodeURIComponent(input)));
+  let h = 0;
+  for (let i = 0; i < input.length; i++) {
+    h = ((h << 5) - h) + input.charCodeAt(i);
+    h = h & h;
+  }
+  return "fallback_" + Math.abs(h).toString(16).padStart(8, "0");
 };
 
 const readAllUserData = () => ls.get(K.DATA, {});
@@ -292,6 +446,35 @@ const writeCurrentUserData = (updater) => {
   const next = mergeUserState(updater(draft) || draft);
   all[userId] = next;
   ls.set(K.DATA, all);
+  return next;
+};
+const SUPPORT_CATEGORY_OPTIONS = [
+  "Course Help",
+  "Certificate",
+  "Account",
+  "Course Request",
+  "General Support",
+];
+const SUPPORT_STATUS_META = {
+  open: { label:"Open", color:C.gold },
+  in_review: { label:"In Review", color:C.em },
+  resolved: { label:"Resolved", color:C.green },
+};
+const normalizeSupportTicket = (raw={}) => ({
+  ...raw,
+  screenshot: normalizeSupportScreenshot(raw.screenshot),
+});
+const readSupportTickets = () => ls.get(K.SUPPORT, []).map(normalizeSupportTicket);
+const writeSupportTickets = (updater) => {
+  const current = readSupportTickets();
+  const draft = clone(current);
+  const next = updater(draft) || draft;
+  try {
+    localStorage.setItem(K.SUPPORT, JSON.stringify(next));
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("nur:data"));
+  } catch {
+    throw new Error("There is not enough browser storage left to save this support request. Remove the screenshot or clear old browser data and try again.");
+  }
   return next;
 };
 
@@ -574,10 +757,16 @@ const DB = {
   enrolled: () => readCurrentUserData().enrollments,
   isEnrolled: (id) => readCurrentUserData().enrollments.includes(id),
   selectedTrack: (id) => readCurrentUserData().courseTracks[String(id)] || null,
+  selectedSeriesCourse: (id) => readCurrentUserData().seriesSelections[String(id)] || null,
   enroll: (id, options={}) => writeCurrentUserData(data => {
     const courseKey = String(id);
     if (!data.enrollments.includes(id)) data.enrollments.push(id);
     if (options.trackKey) data.courseTracks[courseKey] = options.trackKey;
+    if (options.seriesChildId) data.seriesSelections[courseKey] = String(options.seriesChildId);
+  }),
+  setSeriesCourse: (id, childId) => writeCurrentUserData(data => {
+    if (!childId) return;
+    data.seriesSelections[String(id)] = String(childId);
   }),
 
   progress: (cid) => readCurrentUserData().progress[String(cid)] || [],
@@ -1447,6 +1636,44 @@ const buildAasanArabicGrammarModules = (items) =>
       );
     })
     .filter(section => section.lessons.length > 0);
+const madinahArabicLessonTitle = ({ index, sourceTitle }, bookLabel) => {
+  const cleaned = cleanSourceTitle(sourceTitle)
+    .replace(/\(URDU\)/gi, "")
+    .replace(/Introduction to Madinah Arabic Book-?\d+/i, "Introduction")
+    .replace(/Madinah Arabic Book-?\d+\s*,?\s*/gi, "")
+    .replace(/Basic Quranic Grammar,\s*/i, "")
+    .replace(/\s+\|\s+/g, " / ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s\-:/.(),]+|[\s\-:/.(),]+$/g, "")
+    .trim();
+
+  return `Lesson ${pad(index)} - ${cleaned || bookLabel}`;
+};
+const buildMadinahArabicModules = (items, { trackKey, trackLabel, groupSize=8, freeCount=3, sourceLabel="Urdu" }) =>
+  chunk([...items].sort((a, b) => a.index - b.index), groupSize)
+    .map((group, idx) => {
+      const start = group[0]?.index || 0;
+      const end = group[group.length - 1]?.index || start;
+      const lessons = group.map(item => mkLesson(
+        `l34${trackKey}${pad(item.index)}`,
+        madinahArabicLessonTitle(item, trackLabel),
+        item.youtubeId,
+        item.duration,
+        {
+          free: item.index <= freeCount,
+          desc: `Imported from the Madinah Arabic ${trackLabel} ${sourceLabel} playlist.`,
+        }
+      ));
+
+      return mkModule(
+        `m34${trackKey}${String.fromCharCode(97 + idx)}`,
+        `Module ${idx + 1} - Lessons ${pad(start)}-${pad(end)}`,
+        ["📘","🗣️","✍️","🧠","📚","🧭","🏁"][idx % 7],
+        `${trackLabel} lessons ${start} to ${end}.`,
+        lessons
+      );
+    })
+    .filter(section => section.lessons.length > 0);
 const arabiyyaBaynaYadaykLessonTitle = ({ index, sourceTitle }) => {
   const raw = cleanSourceTitle(sourceTitle);
   const book = raw.match(/Book\s*(\d+)/i);
@@ -1546,6 +1773,89 @@ const ARABIC_LEARNING_PATH_TRACKS = {
     note: "A structured Arabic grammar route built from the Al Ajooroomiyya lesson series.",
     playlist: AJOOROOMIYYA_PLAYLIST_ID,
     modules: buildAjooroomiyyaModules(AJOOROOMIYYA_PLAYLIST_ITEMS),
+  },
+};
+const MADINAH_ARABIC_URDU_SERIES_ID = 34;
+const MADINAH_ARABIC_URDU_CHILD_IDS = {
+  book1Urdu: 341,
+  book2Urdu: 342,
+  book3Urdu: 343,
+};
+const MADINAH_ARABIC_URDU_LEGACY_PREFIXES = {
+  book1Urdu: `track-${MADINAH_ARABIC_URDU_SERIES_ID}-book1Urdu`,
+  book2Urdu: `track-${MADINAH_ARABIC_URDU_SERIES_ID}-book2Urdu`,
+  book3Urdu: `track-${MADINAH_ARABIC_URDU_SERIES_ID}-book3Urdu`,
+};
+const MADINAH_ARABIC_URDU_SERIES_CHILD_IDS = Object.values(MADINAH_ARABIC_URDU_CHILD_IDS);
+const MADINAH_ARABIC_URDU_DEFAULT_TRACK = "book1Urdu";
+const MADINAH_ARABIC_URDU_TRACKS = {
+  book1Urdu: {
+    key: "book1Urdu",
+    label: "Book 1 (Urdu)",
+    note: "Begin with Madinah Arabic Book 1 in Urdu, including the introductory grammar lessons and the full first-book pathway.",
+    playlist: MADINAH_ARABIC_BOOK_1_URDU_PLAYLIST_ID,
+    modules: buildMadinahArabicModules(MADINAH_ARABIC_BOOK_1_URDU_PLAYLIST_ITEMS, {
+      trackKey: "b1",
+      trackLabel: "Book 1 (Urdu)",
+      groupSize: 8,
+      freeCount: 3,
+      sourceLabel: "Urdu",
+    }),
+  },
+  book2Urdu: {
+    key: "book2Urdu",
+    label: "Book 2 (Urdu)",
+    note: "Move into Madinah Arabic Book 2 in Urdu with the full lesson sequence arranged into manageable modules.",
+    playlist: MADINAH_ARABIC_BOOK_2_URDU_PLAYLIST_ID,
+    modules: buildMadinahArabicModules(MADINAH_ARABIC_BOOK_2_URDU_PLAYLIST_ITEMS, {
+      trackKey: "b2",
+      trackLabel: "Book 2 (Urdu)",
+      groupSize: 9,
+      freeCount: 3,
+      sourceLabel: "Urdu",
+    }),
+  },
+  book3Urdu: {
+    key: "book3Urdu",
+    label: "Book 3 (Urdu)",
+    note: "Study Madinah Arabic Book 3 in Urdu with the advanced lessons grouped into a focused final track.",
+    playlist: MADINAH_ARABIC_BOOK_3_URDU_PLAYLIST_ID,
+    modules: buildMadinahArabicModules(MADINAH_ARABIC_BOOK_3_URDU_PLAYLIST_ITEMS, {
+      trackKey: "b3",
+      trackLabel: "Book 3 (Urdu)",
+      groupSize: 7,
+      freeCount: 3,
+      sourceLabel: "Urdu",
+    }),
+  },
+};
+const MADINAH_ARABIC_ENGLISH_DEFAULT_TRACK = "book1English";
+const MADINAH_ARABIC_ENGLISH_TRACKS = {
+  book1English: {
+    key: "book1English",
+    label: "Book 1 (English)",
+    note: "Start with Madinah Arabic Book 1 in English, including the opening Quranic Arabic concepts and the complete Book 1 lesson path from the playlist you shared.",
+    playlist: MADINAH_ARABIC_ENGLISH_PLAYLIST_ID,
+    modules: buildMadinahArabicModules(MADINAH_ARABIC_ENGLISH_PLAYLIST_ITEMS, {
+      trackKey: "en1",
+      trackLabel: "Book 1 (English)",
+      groupSize: 8,
+      freeCount: 3,
+      sourceLabel: "English",
+    }),
+  },
+  book2English: {
+    key: "book2English",
+    label: "Book 2 (English)",
+    note: "Continue into Madinah Arabic Book 2 in English with the full second-book sequence organized into structured modules.",
+    playlist: MADINAH_ARABIC_BOOK_2_ENGLISH_PLAYLIST_ID,
+    modules: buildMadinahArabicModules(MADINAH_ARABIC_BOOK_2_ENGLISH_PLAYLIST_ITEMS, {
+      trackKey: "en2",
+      trackLabel: "Book 2 (English)",
+      groupSize: 9,
+      freeCount: 3,
+      sourceLabel: "English",
+    }),
   },
 };
 const sarfLessonTitle = ({ index, sourceTitle }) => {
@@ -1990,6 +2300,80 @@ const COURSES = [
     modules:ARABIC_LEARNING_PATH_TRACKS.arabiyyaBaynaYadayk.modules,
   },
   {
+    id:MADINAH_ARABIC_URDU_SERIES_ID, slug:"madinah-arabic-series-urdu",
+    title:"Madinah Arabic Series (Urdu)", titleAr:"سلسلة العربية بالمدينة - أُردو",
+    instructor:"Nur Academy Arabic Faculty", category:"Arabic", level:"Beginner",
+    rating:4.9, students:1960, price:0, isFree:true,
+    badge:"3 Books", badgeC:C.gold,
+    thumb:"🕌", color:"#4F6F52",
+    desc:"A free Madinah Arabic Urdu series that groups Book 1, Book 2, and Book 3 under one catalog card while keeping each book as its own internal study path.",
+    isSeries:true,
+    seriesCourseIds:MADINAH_ARABIC_URDU_SERIES_CHILD_IDS,
+    defaultSeriesCourseId:MADINAH_ARABIC_URDU_CHILD_IDS.book1Urdu,
+    modules:[],
+  },
+  {
+    id:MADINAH_ARABIC_URDU_CHILD_IDS.book1Urdu, slug:"madinah-arabic-book-1-urdu",
+    title:"Madinah Arabic Book 1 (Urdu)", titleAr:"العربية بالمدينة - الكتاب الأول - أُردو",
+    instructor:"Nur Academy Arabic Faculty", category:"Arabic", level:"Beginner",
+    rating:4.9, students:1960, price:0, isFree:true,
+    badge:"Series", badgeC:C.gold,
+    thumb:"🕌", color:"#4F6F52",
+    desc:"Begin the Madinah Arabic journey with Book 1 in Urdu, covering the opening lessons, vocabulary patterns, and foundational grammar.",
+    seriesOptionTitle:"Book 1 (Urdu)",
+    seriesOptionDesc:"Start from the beginning with the Book 1 Urdu playlist and its foundational Arabic lessons.",
+    parentSeriesId:MADINAH_ARABIC_URDU_SERIES_ID,
+    hiddenFromCatalog:true,
+    displayOrder:1,
+    playlist:MADINAH_ARABIC_URDU_TRACKS.book1Urdu.playlist,
+    modules:namespaceModules(MADINAH_ARABIC_URDU_TRACKS.book1Urdu.modules, MADINAH_ARABIC_URDU_LEGACY_PREFIXES.book1Urdu),
+  },
+  {
+    id:MADINAH_ARABIC_URDU_CHILD_IDS.book2Urdu, slug:"madinah-arabic-book-2-urdu",
+    title:"Madinah Arabic Book 2 (Urdu)", titleAr:"العربية بالمدينة - الكتاب الثاني - أُردو",
+    instructor:"Nur Academy Arabic Faculty", category:"Arabic", level:"Intermediate",
+    rating:4.9, students:1960, price:0, isFree:true,
+    badge:"Series", badgeC:C.gold,
+    thumb:"🕌", color:"#4F6F52",
+    desc:"Continue with Book 2 in Urdu through structured grammar lessons, sentence patterns, and progressively deeper Arabic study.",
+    seriesOptionTitle:"Book 2 (Urdu)",
+    seriesOptionDesc:"Continue into Book 2 with the full Urdu lesson sequence organized into focused study modules.",
+    parentSeriesId:MADINAH_ARABIC_URDU_SERIES_ID,
+    hiddenFromCatalog:true,
+    displayOrder:2,
+    playlist:MADINAH_ARABIC_URDU_TRACKS.book2Urdu.playlist,
+    modules:namespaceModules(MADINAH_ARABIC_URDU_TRACKS.book2Urdu.modules, MADINAH_ARABIC_URDU_LEGACY_PREFIXES.book2Urdu),
+  },
+  {
+    id:MADINAH_ARABIC_URDU_CHILD_IDS.book3Urdu, slug:"madinah-arabic-book-3-urdu",
+    title:"Madinah Arabic Book 3 (Urdu)", titleAr:"العربية بالمدينة - الكتاب الثالث - أُردو",
+    instructor:"Nur Academy Arabic Faculty", category:"Arabic", level:"Advanced",
+    rating:4.9, students:1960, price:0, isFree:true,
+    badge:"Series", badgeC:C.gold,
+    thumb:"🕌", color:"#4F6F52",
+    desc:"Complete the Urdu series with Book 3 and its advanced lesson path, keeping progress and completion separate from the earlier books.",
+    seriesOptionTitle:"Book 3 (Urdu)",
+    seriesOptionDesc:"Move into the advanced Book 3 Urdu track while keeping its lessons and progress separate from the earlier books.",
+    parentSeriesId:MADINAH_ARABIC_URDU_SERIES_ID,
+    hiddenFromCatalog:true,
+    displayOrder:3,
+    playlist:MADINAH_ARABIC_URDU_TRACKS.book3Urdu.playlist,
+    modules:namespaceModules(MADINAH_ARABIC_URDU_TRACKS.book3Urdu.modules, MADINAH_ARABIC_URDU_LEGACY_PREFIXES.book3Urdu),
+  },
+  {
+    id:35, slug:"madinah-arabic-books-1-2-3-english",
+    title:"Madinah Arabic Books 1, 2 & 3 (English)", titleAr:"العربية بالمدينة - الإنجليزية",
+    instructor:"Nur Academy Arabic Faculty", category:"Arabic", level:"Beginner",
+    rating:4.9, students:1420, price:0, isFree:true,
+    badge:"2 Books", badgeC:C.gold,
+    thumb:"📘", color:"#526D82",
+    desc:"A free English Madinah Arabic pathway inside one course card. It currently includes Book 1 and Book 2 as selectable options, with Book 3 ready to be added when you share that playlist.",
+    playlist:MADINAH_ARABIC_ENGLISH_TRACKS.book1English.playlist,
+    defaultTrack:MADINAH_ARABIC_ENGLISH_DEFAULT_TRACK,
+    trackOptions:MADINAH_ARABIC_ENGLISH_TRACKS,
+    modules:MADINAH_ARABIC_ENGLISH_TRACKS.book1English.modules,
+  },
+  {
     id:26, slug:"aqidah-at-tahawi",
     title:"Aqidah At-Tahawi", titleAr:"العقيدة الطحاوية",
     instructor:"Asrar Rashid", category:"Aqidah", level:"Intermediate",
@@ -2152,12 +2536,42 @@ const buildAdminStarterModules = ({ id, playlist="", firstVideoId="", firstLesso
     ]
   ),
 ];
+const usesAdminStarterModules = (course={}) => {
+  const firstModule = Array.isArray(course.modules) ? course.modules[0] : null;
+  const firstLesson = Array.isArray(firstModule?.lessons) ? firstModule.lessons[0] : null;
+  return Boolean(
+    course?.id &&
+    Array.isArray(course.modules) &&
+    course.modules.length === 1 &&
+    firstModule?.id === `m${course.id}a` &&
+    Array.isArray(firstModule.lessons) &&
+    firstModule.lessons.length === 1 &&
+    firstLesson?.id === `l${course.id}01`
+  );
+};
+const buildAdminCourseFormState = (course=null) => ({
+  title: course?.title || "",
+  titleAr: course?.titleAr || "",
+  instructor: course?.instructor || "",
+  category: course?.category || "Fiqh",
+  level: course?.level || "Beginner",
+  thumb: course?.thumb || "📘",
+  color: course?.color || C.em,
+  playlist: course?.playlist || "",
+  firstVideoId: course?.firstVideoId || "",
+  firstLessonTitle: course?.firstLessonTitle || "Lesson 01 - Introduction",
+  firstLessonDuration: course?.firstLessonDuration || "15:00",
+  price: safeNum(course?.price, 0) > 0 ? String(safeNum(course.price, 0)) : "",
+  status: course?.isVisible === false ? "draft" : "published",
+  desc: course?.desc || "",
+});
 const normalizeCustomCourse = (raw={}) => {
   const id = safeNum(raw.id, 0);
   const title = String(raw.title || "").trim();
   if (!id || !title) return null;
 
   const price = Math.max(0, safeNum(raw.price, 0));
+  const isVisible = raw.isVisible !== false;
   const course = {
     id,
     slug: slugifyCourseValue(raw.slug || title, `course-${id}`),
@@ -2169,7 +2583,9 @@ const normalizeCustomCourse = (raw={}) => {
     rating: Math.max(0, safeNum(raw.rating, 4.8)),
     students: Math.max(0, safeNum(raw.students, 0)),
     price,
-    isFree: raw.isFree !== false && price <= 0,
+    isFree: price <= 0,
+    isVisible,
+    status: isVisible ? "published" : "draft",
     badge: String(raw.badge || "Custom").trim() || "Custom",
     badgeC: String(raw.badgeC || C.gold).trim() || C.gold,
     thumb: String(raw.thumb || "📘").trim() || "📘",
@@ -2197,23 +2613,184 @@ const writeCustomCourses = (updater) => {
   ls.set(K.COURSES, nextCourses);
   return nextCourses.map(normalizeCustomCourse).filter(Boolean);
 };
-const getCourseCatalog = () => [...COURSES, ...readCustomCourses()];
-const getNextCourseId = () => getCourseCatalog().reduce((max, course) => Math.max(max, safeNum(course.id, 0)), 0) + 1;
+const isCourseVisible = (course={}) => {
+  if (course.hiddenFromCatalog) return false;
+  return course.adminManaged ? course.isVisible !== false : true;
+};
+const getCourseCatalog = ({ includeHidden=false }={}) => {
+  const catalog = [...COURSES, ...readCustomCourses()];
+  return includeHidden ? catalog : catalog.filter(isCourseVisible);
+};
+const getCourseById = (id) => getCourseCatalog({ includeHidden:true }).find(course => String(course.id) === String(id)) || null;
+const findCatalogCourse = (courseLike) => {
+  if (!courseLike) return null;
+  return getCourseCatalog({ includeHidden:true }).find(course =>
+    String(course.id) === String(courseLike.id) ||
+    (course.slug && course.slug === courseLike.slug)
+  ) || courseLike;
+};
+const sortSeriesCourses = (a, b) => {
+  const orderDiff = safeNum(a?.displayOrder, 999) - safeNum(b?.displayOrder, 999);
+  return orderDiff || String(a?.title || "").localeCompare(String(b?.title || ""));
+};
+const isSeriesCourse = (course={}) => Boolean(course?.isSeries && Array.isArray(course.seriesCourseIds) && course.seriesCourseIds.length > 0);
+const getSeriesChildren = (courseLike) => {
+  const course = findCatalogCourse(courseLike);
+  if (!course) return [];
+
+  const linkedChildren = Array.isArray(course.seriesCourseIds) && course.seriesCourseIds.length
+    ? course.seriesCourseIds.map(id => getCourseById(id)).filter(Boolean)
+    : getCourseCatalog({ includeHidden:true }).filter(child => String(child.parentSeriesId || "") === String(course.id));
+
+  return [...linkedChildren].sort(sortSeriesCourses);
+};
+const getSeriesOptionLabel = (course={}) => course.seriesOptionTitle || course.title || "";
+const getSeriesOptionDescription = (course={}) => course.seriesOptionDesc || course.desc || "";
+const getNextCourseId = () => getCourseCatalog({ includeHidden:true }).reduce((max, course) => Math.max(max, safeNum(course.id, 0)), 0) + 1;
 const prunePlaceholderModules = (modules=[]) => modules
   .map(module => ({
     ...module,
     lessons: module.lessons.filter(lesson => Boolean(getYtId(lesson.youtubeId))),
   }))
   .filter(module => module.lessons.length > 0);
+const LEGACY_SERIES_MIGRATIONS = [
+  {
+    parentId: MADINAH_ARABIC_URDU_SERIES_ID,
+    defaultChildId: MADINAH_ARABIC_URDU_CHILD_IDS.book1Urdu,
+    trackToChildId: MADINAH_ARABIC_URDU_CHILD_IDS,
+    prefixes: Object.entries(MADINAH_ARABIC_URDU_LEGACY_PREFIXES).map(([trackKey, prefix]) => ({
+      trackKey,
+      prefix,
+      childId: MADINAH_ARABIC_URDU_CHILD_IDS[trackKey],
+    })),
+  },
+];
+const bucketLegacyLessonIds = (lessonIds=[], migration) => {
+  const buckets = {};
+  const remainder = [];
+
+  lessonIds.forEach(id => {
+    const lessonId = String(id);
+    const match = migration.prefixes.find(entry => lessonId.startsWith(`${entry.prefix}-`) || lessonId === entry.prefix);
+    if (match) {
+      if (!buckets[match.childId]) buckets[match.childId] = [];
+      buckets[match.childId].push(id);
+      return;
+    }
+    remainder.push(id);
+  });
+
+  return { buckets, remainder };
+};
+const bucketLegacyWatchEntries = (watchEntries=[], migration) => {
+  const buckets = {};
+  const remainder = [];
+
+  watchEntries.forEach(([key, value]) => {
+    const lessonId = String(key).split(":").slice(1).join(":");
+    const match = migration.prefixes.find(entry => lessonId.startsWith(`${entry.prefix}-`) || lessonId === entry.prefix);
+    if (match) {
+      if (!buckets[match.childId]) buckets[match.childId] = [];
+      buckets[match.childId].push([lessonId, value]);
+      return;
+    }
+    remainder.push([lessonId, value]);
+  });
+
+  return { buckets, remainder };
+};
+const inferLegacySeriesChildId = (state, migration, progressBuckets={}, watchBuckets={}) => {
+  const parentKey = String(migration.parentId);
+  const storedSeriesId = String(state.seriesSelections[parentKey] || "");
+  if (migration.prefixes.some(entry => String(entry.childId) === storedSeriesId)) return storedSeriesId;
+
+  const storedTrack = String(state.courseTracks[parentKey] || "");
+  if (migration.trackToChildId[storedTrack]) return String(migration.trackToChildId[storedTrack]);
+
+  const usageScores = migration.prefixes.map(entry => ({
+    childId: String(entry.childId),
+    score: (progressBuckets[entry.childId]?.length || 0) + (watchBuckets[entry.childId]?.length || 0),
+  }));
+  const activeBucket = usageScores.sort((a, b) => b.score - a.score)[0];
+  if (activeBucket?.score > 0) return activeBucket.childId;
+
+  return String(migration.defaultChildId);
+};
+const migrateLegacySeriesState = (state) => {
+  let changed = false;
+  const nextState = mergeUserState(state || {});
+
+  LEGACY_SERIES_MIGRATIONS.forEach(migration => {
+    const parentKey = String(migration.parentId);
+    const legacyProgress = [...(nextState.progress[parentKey] || [])];
+    const legacyWatchEntries = Object.entries(nextState.watch).filter(([key]) => key.startsWith(`${parentKey}:`));
+    const { buckets: progressBuckets, remainder: progressRemainder } = bucketLegacyLessonIds(legacyProgress, migration);
+    const { buckets: watchBuckets, remainder: watchRemainder } = bucketLegacyWatchEntries(legacyWatchEntries, migration);
+    const activeChildId = inferLegacySeriesChildId(nextState, migration, progressBuckets, watchBuckets);
+
+    if (String(nextState.seriesSelections[parentKey] || "") !== activeChildId) {
+      nextState.seriesSelections[parentKey] = activeChildId;
+      changed = true;
+    }
+
+    if (nextState.courseTracks[parentKey]) {
+      delete nextState.courseTracks[parentKey];
+      changed = true;
+    }
+
+    if (legacyProgress.length) {
+      Object.entries(progressBuckets).forEach(([childId, lessonIds]) => {
+        nextState.progress[childId] = [...new Set([...(nextState.progress[childId] || []), ...lessonIds])];
+      });
+      if (progressRemainder.length) {
+        nextState.progress[activeChildId] = [...new Set([...(nextState.progress[activeChildId] || []), ...progressRemainder])];
+      }
+      delete nextState.progress[parentKey];
+      changed = true;
+    }
+
+    if (legacyWatchEntries.length) {
+      Object.entries(watchBuckets).forEach(([childId, entries]) => {
+        entries.forEach(([lessonId, value]) => {
+          nextState.watch[`${childId}:${lessonId}`] = {
+            ...(nextState.watch[`${childId}:${lessonId}`] || {}),
+            ...value,
+          };
+        });
+      });
+      if (watchRemainder.length) {
+        watchRemainder.forEach(([lessonId, value]) => {
+          nextState.watch[`${activeChildId}:${lessonId}`] = {
+            ...(nextState.watch[`${activeChildId}:${lessonId}`] || {}),
+            ...value,
+          };
+        });
+      }
+      legacyWatchEntries.forEach(([key]) => { delete nextState.watch[key]; });
+      changed = true;
+    }
+
+    if (nextState.completions[parentKey]) {
+      if (!nextState.completions[activeChildId]) nextState.completions[activeChildId] = nextState.completions[parentKey];
+      delete nextState.completions[parentKey];
+      changed = true;
+    }
+  });
+
+  return changed ? nextState : state;
+};
 const pruneStoredCourseData = () => {
-  const validCourseIds = new Set(getCourseCatalog().map(course => String(course.id)));
+  const validCourseIds = new Set(getCourseCatalog({ includeHidden:true }).map(course => String(course.id)));
   const allData = readAllUserData();
   let changed = false;
 
   Object.keys(allData).forEach(userId => {
-    const state = mergeUserState(allData[userId] || {});
+    const mergedState = mergeUserState(allData[userId] || {});
+    const state = migrateLegacySeriesState(mergedState);
+    const wasMigrated = state !== mergedState;
     const nextEnrollments = state.enrollments.filter(id => validCourseIds.has(String(id)));
     const nextCourseTracks = Object.fromEntries(Object.entries(state.courseTracks).filter(([courseId]) => validCourseIds.has(String(courseId))));
+    const nextSeriesSelections = Object.fromEntries(Object.entries(state.seriesSelections).filter(([courseId, childId]) => validCourseIds.has(String(courseId)) && validCourseIds.has(String(childId))));
     const nextProgress = Object.fromEntries(Object.entries(state.progress).filter(([courseId]) => validCourseIds.has(String(courseId))));
     const nextCompletions = Object.fromEntries(Object.entries(state.completions).filter(([courseId]) => validCourseIds.has(String(courseId))));
     const nextWatch = Object.fromEntries(Object.entries(state.watch).filter(([key]) => validCourseIds.has(String(key).split(":")[0])));
@@ -2221,15 +2798,18 @@ const pruneStoredCourseData = () => {
     if (
       nextEnrollments.length !== state.enrollments.length ||
       Object.keys(nextCourseTracks).length !== Object.keys(state.courseTracks).length ||
+      Object.keys(nextSeriesSelections).length !== Object.keys(state.seriesSelections).length ||
       Object.keys(nextProgress).length !== Object.keys(state.progress).length ||
       Object.keys(nextCompletions).length !== Object.keys(state.completions).length ||
-      Object.keys(nextWatch).length !== Object.keys(state.watch).length
+      Object.keys(nextWatch).length !== Object.keys(state.watch).length ||
+      wasMigrated
     ) {
       changed = true;
       allData[userId] = {
         ...state,
         enrollments: nextEnrollments,
         courseTracks: nextCourseTracks,
+        seriesSelections: nextSeriesSelections,
         progress: nextProgress,
         completions: nextCompletions,
         watch: nextWatch,
@@ -2247,20 +2827,29 @@ const selectCourseTrackKey = (course, preferredTrackKey) => {
   const requested = preferredTrackKey || course.selectedTrackKey || DB.selectedTrack(course.id) || fallback;
   return course.trackOptions[requested] ? requested : fallback;
 };
-const resolveCourse = (courseLike) => {
-  if (!courseLike) return null;
-  const baseCourse = getCourseCatalog().find(course =>
-    course.id === courseLike.id ||
-    (course.slug && course.slug === courseLike.slug)
-  ) || courseLike;
+const getSeriesSelectionId = (courseLike, preferredChildId) => {
+  const course = findCatalogCourse(courseLike);
+  if (!isSeriesCourse(course)) return null;
 
-  if (!baseCourse.trackOptions) {
-    return baseCourse.hidePlaceholderLessons
+  const children = getSeriesChildren(course);
+  if (!children.length) return null;
+
+  const validIds = new Set(children.map(child => String(child.id)));
+  const fallback = validIds.has(String(course.defaultSeriesCourseId))
+    ? String(course.defaultSeriesCourseId)
+    : String(children[0].id);
+  const requested = preferredChildId || courseLike?.activeSeriesCourseId || DB.selectedSeriesCourse(course.id) || fallback;
+  return validIds.has(String(requested)) ? String(requested) : fallback;
+};
+const resolveCourseWithoutSeries = (courseLike) => {
+  const baseCourse = findCatalogCourse(courseLike);
+  if (!baseCourse?.trackOptions) {
+    return baseCourse?.hidePlaceholderLessons
       ? { ...baseCourse, modules: prunePlaceholderModules(baseCourse.modules) }
       : baseCourse;
   }
 
-  const trackKey = selectCourseTrackKey(baseCourse, courseLike.selectedTrackKey);
+  const trackKey = selectCourseTrackKey(baseCourse, courseLike?.selectedTrackKey);
   const track = trackKey ? baseCourse.trackOptions[trackKey] : null;
   if (!track) return baseCourse;
   const rawModules = track.modules?.length
@@ -2281,6 +2870,81 @@ const resolveCourse = (courseLike) => {
     ? { ...resolvedCourse, modules: prunePlaceholderModules(resolvedCourse.modules) }
     : resolvedCourse;
 };
+const resolveCourse = (courseLike) => {
+  if (!courseLike) return null;
+  const baseCourse = findCatalogCourse(courseLike);
+  const resolvedBase = resolveCourseWithoutSeries(courseLike);
+
+  if (!isSeriesCourse(baseCourse)) return resolvedBase;
+
+  const seriesCourses = getSeriesChildren(baseCourse).map(child => resolveCourse(child));
+  const activeSeriesCourseId = getSeriesSelectionId(courseLike, courseLike?.activeSeriesCourseId);
+  const activeSeriesCourse = seriesCourses.find(child => String(child.id) === String(activeSeriesCourseId)) || seriesCourses[0] || null;
+
+  return {
+    ...resolvedBase,
+    activeSeriesCourseId: activeSeriesCourse?.id || null,
+    activeSeriesCourse,
+    seriesCourses,
+    selectedSeriesLabel: activeSeriesCourse ? getSeriesOptionLabel(activeSeriesCourse) : "",
+    selectedSeriesNote: activeSeriesCourse ? getSeriesOptionDescription(activeSeriesCourse) : "",
+    playlist: activeSeriesCourse?.playlist || resolvedBase?.playlist,
+    modules: activeSeriesCourse?.modules || [],
+  };
+};
+const getCourseStudyCourse = (courseLike) => {
+  const resolvedCourse = resolveCourse(courseLike);
+  return resolvedCourse?.activeSeriesCourse || resolvedCourse;
+};
+const getCourseEnrollmentId = (courseLike) => {
+  const resolvedCourse = resolveCourse(courseLike);
+  return resolvedCourse?.parentSeriesId || resolvedCourse?.id || null;
+};
+const getCourseProgressIds = (courseLike) => {
+  const studyCourse = getCourseStudyCourse(courseLike);
+  return studyCourse ? DB.progress(studyCourse.id) : [];
+};
+const getCourseCompletionRecord = (courseLike) => {
+  const studyCourse = getCourseStudyCourse(courseLike);
+  return studyCourse ? DB.courseCompletion(studyCourse.id) : null;
+};
+const getCourseSelectionLabel = (course={}) => course.selectedSeriesLabel || course.selectedTrackLabel || "";
+const getCourseSelectionNote = (course={}) => course.selectedSeriesNote || course.selectedTrackNote || "";
+const getCourseDetailTarget = (courseLike) => {
+  const resolvedCourse = resolveCourse(courseLike);
+  if (!resolvedCourse) return null;
+  if (!resolvedCourse.parentSeriesId) return resolvedCourse;
+  return resolveCourse({ id: resolvedCourse.parentSeriesId }) || resolvedCourse;
+};
+const getCourseCertificateEntries = (courseLike) => {
+  const resolvedCourse = resolveCourse(courseLike);
+  if (!resolvedCourse) return [];
+
+  if (resolvedCourse.isSeries) {
+    return getSeriesChildren(resolvedCourse)
+      .map(child => resolveCourse(child))
+      .map(child => ({
+        key: `${resolvedCourse.id}:${child.id}`,
+        displayCourse: resolvedCourse,
+        certificateCourse: child,
+        completion: getCourseCompletionRecord(child),
+        selectionLabel: getSeriesOptionLabel(child),
+      }))
+      .filter(entry => Boolean(entry.completion));
+  }
+
+  const certificateCourse = getCourseStudyCourse(resolvedCourse);
+  const completion = getCourseCompletionRecord(resolvedCourse);
+  if (!certificateCourse || !completion) return [];
+
+  return [{
+    key: String(certificateCourse.id),
+    displayCourse: resolvedCourse,
+    certificateCourse,
+    completion,
+    selectionLabel: getCourseSelectionLabel(resolvedCourse),
+  }];
+};
 const AdminDB = {
   users: () => [...Auth.users()].sort((a, b) => {
     if (a.role === b.role) return a.name.localeCompare(b.name);
@@ -2291,6 +2955,7 @@ const AdminDB = {
     if (!Auth.isAdmin()) throw new Error("Only administrators can add courses.");
     const title = String(form.title || "").trim();
     if (!title) throw new Error("Please enter a course title.");
+    const price = Math.max(0, safeNum(form.price, 0));
 
     const rawCourse = {
       id: getNextCourseId(),
@@ -2302,8 +2967,9 @@ const AdminDB = {
       level: LEVEL_OPTIONS.includes(form.level) ? form.level : "Beginner",
       rating: 5,
       students: 0,
-      price: 0,
-      isFree: true,
+      price,
+      isFree: price <= 0,
+      isVisible: form.status !== "draft",
       badge: String(form.badge || "Custom").trim() || "Custom",
       badgeC: String(form.badgeC || C.gold).trim() || C.gold,
       thumb: String(form.thumb || "📘").trim() || "📘",
@@ -2318,6 +2984,45 @@ const AdminDB = {
 
     const course = normalizeCustomCourse(rawCourse);
     writeCustomCourses(courses => [...courses, course]);
+    return course;
+  },
+  updateCourse: (courseId, form={}) => {
+    if (!Auth.isAdmin()) throw new Error("Only administrators can edit courses.");
+    const customCourses = readCustomCourses();
+    const existing = customCourses.find(course => course.id === courseId);
+    if (!existing) throw new Error("Only custom admin-added courses can be edited.");
+
+    const title = String(form.title || "").trim();
+    if (!title) throw new Error("Please enter a course title.");
+
+    const price = Math.max(0, safeNum(form.price, existing.price || 0));
+    const nextDraft = {
+      ...existing,
+      ...form,
+      id: existing.id,
+      slug: existing.slug,
+      rating: existing.rating,
+      students: existing.students,
+      createdAt: existing.createdAt,
+      price,
+      isFree: price <= 0,
+      isVisible: form.status !== "draft",
+    };
+
+    if (usesAdminStarterModules(existing)) {
+      nextDraft.modules = buildAdminStarterModules({
+        id: existing.id,
+        playlist: String(nextDraft.playlist || "").trim(),
+        firstVideoId: String(nextDraft.firstVideoId || "").trim(),
+        firstLessonTitle: String(nextDraft.firstLessonTitle || "").trim(),
+        firstLessonDuration: String(nextDraft.firstLessonDuration || "").trim(),
+      });
+    } else {
+      nextDraft.modules = existing.modules;
+    }
+
+    const course = normalizeCustomCourse(nextDraft);
+    writeCustomCourses(courses => courses.map(item => safeNum(item.id, 0) === courseId ? course : item));
     return course;
   },
   deleteCourse: (courseId) => {
@@ -2346,7 +3051,7 @@ const AdminDB = {
   },
   certificates: () => {
     const usersById = new Map(Auth.users().map(user => [user.id, user]));
-    const coursesById = new Map(getCourseCatalog().map(course => [String(course.id), course]));
+    const coursesById = new Map(getCourseCatalog({ includeHidden:true }).map(course => [String(course.id), course]));
     return Object.entries(readAllUserData()).flatMap(([userId, raw]) => {
       const data = mergeUserState(raw || {});
       return Object.entries(data.completions || {}).map(([courseId, completion]) => ({
@@ -2358,7 +3063,7 @@ const AdminDB = {
   },
   certificateStatusForUser: (userId) => {
     const data = mergeUserState(readAllUserData()[userId] || {});
-    return getCourseCatalog()
+    return getCourseCatalog({ includeHidden:true })
       .map(course => resolveCourse(course))
       .filter(course => totalLessons(course) > 0)
       .map(course => ({
@@ -2374,6 +3079,62 @@ const AdminDB = {
     allData[userId] = defaultUserState();
     ls.set(K.DATA, allData);
     return true;
+  },
+};
+const SupportDB = {
+  all: () => [...readSupportTickets()].sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""))),
+  forUser: (userId) => SupportDB.all().filter(ticket => ticket.userId === userId),
+  submit: ({ user, subject, message, category="General Support", courseId="", courseTitle="", screenshot=null }) => {
+    if (!user?.id) throw new Error("You need to sign in before sending a support request.");
+    const cleanSubject = String(subject || "").replace(/\s+/g, " ").trim();
+    const cleanMessage = String(message || "").trim();
+    if (!cleanSubject) throw new Error("Please add a short subject.");
+    if (cleanMessage.length < 12) throw new Error("Please add a little more detail so the academy can help.");
+
+    const now = new Date().toISOString();
+    const ticket = {
+      id: newSupportId(),
+      userId: user.id,
+      userName: user.name,
+      userEmail: user.email,
+      category: SUPPORT_CATEGORY_OPTIONS.includes(category) ? category : "General Support",
+      subject: cleanSubject,
+      message: cleanMessage,
+      courseId: String(courseId || "").trim(),
+      courseTitle: String(courseTitle || "").trim(),
+      screenshot: normalizeSupportScreenshot(screenshot),
+      status: "open",
+      adminNote: "",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    writeSupportTickets(tickets => [ticket, ...tickets]);
+    return ticket;
+  },
+  update: (ticketId, patch={}) => {
+    if (!Auth.isAdmin()) throw new Error("Only administrators can update support requests.");
+    let updatedTicket = null;
+    writeSupportTickets(tickets => tickets.map(ticket => {
+      if (ticket.id !== ticketId) return ticket;
+      updatedTicket = {
+        ...ticket,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      return updatedTicket;
+    }));
+    if (!updatedTicket) throw new Error("Support request not found.");
+    return updatedTicket;
+  },
+  counts: () => {
+    const tickets = SupportDB.all();
+    return tickets.reduce((summary, ticket) => {
+      const key = SUPPORT_STATUS_META[ticket.status] ? ticket.status : "open";
+      summary.total += 1;
+      summary[key] += 1;
+      return summary;
+    }, { total:0, open:0, in_review:0, resolved:0 });
   },
 };
 
@@ -2451,7 +3212,8 @@ const lessonStatePosition = (course, lessonState={}) => {
   return { mi, li };
 };
 const createLessonState = (courseLike, mi=0, li=0) => {
-  const course = resolveCourse(courseLike);
+  const detailCourse = resolveCourse(courseLike);
+  const course = detailCourse?.activeSeriesCourse || detailCourse;
   if (!course || !course.modules?.length) return null;
 
   const nextPosition = lessonStatePosition(course, { mi, li });
@@ -2461,6 +3223,7 @@ const createLessonState = (courseLike, mi=0, li=0) => {
     courseId: course.id,
     courseSlug: course.slug,
     selectedTrackKey: course.selectedTrackKey || null,
+    parentSeriesId: course.parentSeriesId || (detailCourse?.isSeries ? detailCourse.id : null),
     lessonId: lesson?.id || null,
     mi: nextPosition.mi,
     li: nextPosition.li,
@@ -2483,9 +3246,13 @@ const courseDoneIds = (course, rawDoneIds=[]) => {
   const lessonIds = new Set(flatLessons(course).map(lesson => lesson.id));
   return (rawDoneIds || []).filter(id => lessonIds.has(id));
 };
-const courseProgressStats = (course, rawDoneIds=course ? DB.progress(course.id) : []) => {
-  const total = course ? totalLessons(course) : 0;
-  const doneIds = courseDoneIds(course, rawDoneIds);
+const courseProgressStats = (course, rawDoneIds) => {
+  const studyCourse = course?.activeSeriesCourse || course;
+  const doneSource = rawDoneIds === undefined
+    ? (studyCourse ? DB.progress(studyCourse.id) : [])
+    : rawDoneIds;
+  const total = studyCourse ? totalLessons(studyCourse) : 0;
+  const doneIds = courseDoneIds(studyCourse, doneSource);
   const completed = doneIds.length;
   return {
     doneIds,
@@ -2789,8 +3556,9 @@ const openCertificatePrintWindow = (course, user, completion) => {
   const logoSrc = new URL(BRAND_LOGO_SRC, window.location.href).href;
   const sealSrc = new URL(sealImage, window.location.href).href;
   const signatureSrc = new URL(signatureImage, window.location.href).href;
+  const certificateLabel = getCourseSelectionLabel(course);
   const studentName = escapeHtml(user.name);
-  const courseTitle = escapeHtml(course.selectedTrackLabel ? `${course.title} (${course.selectedTrackLabel} Track)` : course.title);
+  const courseTitle = escapeHtml(certificateLabel ? `${course.title} (${certificateLabel})` : course.title);
   const courseTitleAr = escapeHtml(course.titleAr || "");
   const completedAt = escapeHtml(formatDay(completion.completedAt));
   const certificateId = escapeHtml(completion.certificateId);
@@ -2976,7 +3744,7 @@ const printCertificate = async (course, user, completion) => {
 
     await exportCertificatePdf({
       element: frame,
-      courseName: course.selectedTrackLabel ? `${course.title} (${course.selectedTrackLabel} Track)` : course.title,
+      courseName: getCourseSelectionLabel(course) ? `${course.title} (${getCourseSelectionLabel(course)})` : course.title,
       studentName: user.name,
       onFallbackPrint: () => openCertificatePrintWindow(course, user, completion),
     });
@@ -3325,20 +4093,22 @@ const StreakWidget = ({ big=false }) => {
 // ─── Course Card ──────────────────────────────────────────────────────────────
 const CourseCard = ({ course, onClick }) => {
   const displayCourse = resolveCourse(course);
+  const selectionLabel = getCourseSelectionLabel(displayCourse);
+  const enrollmentCourseId = getCourseEnrollmentId(displayCourse);
   const [pct, setPct] = useState(0);
-  const [enrolled, setEnrolled] = useState(DB.isEnrolled(displayCourse.id));
+  const [enrolled, setEnrolled] = useState(Boolean(enrollmentCourseId) && DB.isEnrolled(enrollmentCourseId));
   const viewerId = currentUserId();
   useEffect(() => {
     const sync = () => {
       const stats = courseProgressStats(displayCourse);
       setPct(stats.pct);
-      setEnrolled(DB.isEnrolled(displayCourse.id));
+      setEnrolled(Boolean(enrollmentCourseId) && DB.isEnrolled(enrollmentCourseId));
     };
 
     sync();
     window.addEventListener("nur:data", sync);
     return () => window.removeEventListener("nur:data", sync);
-  }, [displayCourse.id, displayCourse.selectedTrackKey, viewerId]);
+  }, [displayCourse.activeSeriesCourseId, displayCourse.id, displayCourse.selectedTrackKey, enrollmentCourseId, viewerId]);
 
   return (
     <div className="card" onClick={() => onClick(displayCourse)}
@@ -3364,7 +4134,7 @@ const CourseCard = ({ course, onClick }) => {
         <div style={{display:"flex",gap:5,marginBottom:7}}>
           <Badge col={C.emL}>{displayCourse.category}</Badge>
           <Badge col={C.textL}>{displayCourse.level}</Badge>
-          {enrolled&&displayCourse.selectedTrackLabel&&<Badge col={C.gold}>{displayCourse.selectedTrackLabel}</Badge>}
+          {enrolled&&selectionLabel&&<Badge col={C.gold}>{selectionLabel}</Badge>}
         </div>
         <h3 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.08rem",fontWeight:700,color:C.text,marginBottom:2,lineHeight:1.25}}>{displayCourse.title}</h3>
         <p style={{fontFamily:"'Amiri',serif",fontSize:".8rem",color:C.gold,marginBottom:7}}>{displayCourse.titleAr}</p>
@@ -3546,9 +4316,15 @@ const Navbar = ({ page, setPage, currentUser, onSignOut }) => {
           {currentUser ? (
             <div className="nav-actions" style={{marginLeft:6}}>
               {streak>0&&<div style={{display:"flex",justifyContent:"center"}}><StreakWidget/></div>}
-              <Btn size="sm" v="ghost" onClick={()=>openPage("dashboard")}>Dashboard</Btn>
-              {currentUser.role==="admin"&&<Btn size="sm" v="ghost" onClick={()=>openPage("admin")}>Admin</Btn>}
-              <div className="nav-avatar" onClick={()=>openPage("dashboard")} title={currentUser.name}
+              {currentUser.role==="admin" ? (
+                <>
+                  <Btn size="sm" v="ghost" onClick={()=>openPage("admin")}>Admin Workspace</Btn>
+                  <Btn size="sm" v="outline" onClick={()=>openPage("dashboard")}>Learner View</Btn>
+                </>
+              ) : (
+                <Btn size="sm" v="ghost" onClick={()=>openPage("dashboard")}>Student Dashboard</Btn>
+              )}
+              <div className="nav-avatar" onClick={()=>openPage(currentUser.role==="admin" ? "admin" : "dashboard")} title={currentUser.name}
                 style={{width:32,height:32,borderRadius:"50%",background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontWeight:700,fontSize:".8rem",cursor:"pointer",flexShrink:0}}>
                 {getInitials(currentUser.name)}
               </div>
@@ -3805,48 +4581,82 @@ const CoursesPage = ({ setPage, setCourse }) => {
 };
 
 // ─── COURSE DETAIL ────────────────────────────────────────────────────────────
-const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
+const CourseDetailPage = ({ course, setPage, setLesson, setCourse, loggedIn }) => {
   const baseCourse = resolveCourse(course);
+  const isSeries = Boolean(baseCourse?.isSeries);
   const [trackKey, setTrackKey] = useState(baseCourse?.selectedTrackKey || baseCourse?.defaultTrack || null);
-  const courseView = resolveCourse({ ...baseCourse, selectedTrackKey: trackKey });
-  const [enrolled, setEnrolled] = useState(DB.isEnrolled(courseView?.id));
-  const [doneIds,  setDoneIds ] = useState(DB.progress(courseView?.id));
+  const [seriesChildId, setSeriesChildId] = useState(baseCourse?.activeSeriesCourseId ? String(baseCourse.activeSeriesCourseId) : null);
+  const courseView = resolveCourse({
+    ...baseCourse,
+    ...(isSeries ? { activeSeriesCourseId: seriesChildId } : { selectedTrackKey: trackKey }),
+  });
+  const studyCourse = courseView?.activeSeriesCourse || courseView;
+  const enrollmentCourseId = courseView?.parentSeriesId || courseView?.id;
+  const [enrolled, setEnrolled] = useState(Boolean(enrollmentCourseId) && DB.isEnrolled(enrollmentCourseId));
+  const [doneIds,  setDoneIds ] = useState(studyCourse ? DB.progress(studyCourse.id) : []);
   const [tab,      setTab     ] = useState("modules");
   const [popped,   setPopped  ] = useState(false);
 
   useEffect(() => {
     if (!baseCourse) return;
     const sync = () => {
-      setTrackKey(DB.selectedTrack(baseCourse.id) || baseCourse.selectedTrackKey || baseCourse.defaultTrack || null);
-      setEnrolled(DB.isEnrolled(baseCourse.id));
-      setDoneIds(DB.progress(baseCourse.id));
+      const nextTrackKey = baseCourse.trackOptions
+        ? (DB.selectedTrack(baseCourse.id) || baseCourse.selectedTrackKey || baseCourse.defaultTrack || null)
+        : null;
+      const nextSeriesChildId = baseCourse.isSeries
+        ? getSeriesSelectionId(baseCourse, seriesChildId || baseCourse.activeSeriesCourseId)
+        : null;
+      const nextCourse = resolveCourse({
+        ...baseCourse,
+        ...(baseCourse.isSeries ? { activeSeriesCourseId: nextSeriesChildId } : { selectedTrackKey: nextTrackKey }),
+      });
+      const nextStudyCourse = nextCourse?.activeSeriesCourse || nextCourse;
+      const nextEnrollmentCourseId = nextCourse?.parentSeriesId || nextCourse?.id;
+
+      if (baseCourse.trackOptions) setTrackKey(nextTrackKey);
+      if (baseCourse.isSeries) setSeriesChildId(nextSeriesChildId ? String(nextSeriesChildId) : null);
+      setEnrolled(Boolean(nextEnrollmentCourseId) && DB.isEnrolled(nextEnrollmentCourseId));
+      setDoneIds(nextStudyCourse ? DB.progress(nextStudyCourse.id) : []);
     };
 
     sync();
     window.addEventListener("nur:data", sync);
     return () => window.removeEventListener("nur:data", sync);
-  }, [baseCourse?.defaultTrack, baseCourse?.id, baseCourse?.selectedTrackKey]);
+  }, [baseCourse?.activeSeriesCourseId, baseCourse?.defaultSeriesCourseId, baseCourse?.defaultTrack, baseCourse?.id, baseCourse?.selectedTrackKey, seriesChildId]);
 
   const courseData = courseView;
-  const trackChoices = courseData?.trackOptions ? Object.entries(courseData.trackOptions) : [];
+  const trackChoices = !courseData?.isSeries && courseData?.trackOptions ? Object.entries(courseData.trackOptions) : [];
+  const seriesChoices = courseData?.isSeries ? courseData.seriesCourses || [] : [];
+  const selectionLabel = getCourseSelectionLabel(courseData);
+  const selectionNote = getCourseSelectionNote(courseData);
   const progress = courseData ? courseProgressStats(courseData, doneIds) : { doneIds:[], completed:0, total:0, pct:0 };
-  const completion = courseData ? DB.courseCompletion(courseData.id) : null;
+  const completion = courseData ? getCourseCompletionRecord(courseData) : null;
   const completedIds = progress.doneIds;
   const tot = progress.total;
   const dn  = progress.completed;
   const pct = progress.pct;
-  const nextLesson = courseData ? flatLessons(courseData).find(item => !completedIds.includes(item.id)) || flatLessons(courseData)[0] : null;
+  const nextLesson = studyCourse ? flatLessons(studyCourse).find(item => !completedIds.includes(item.id)) || flatLessons(studyCourse)[0] : null;
+  const parentSeriesCourse = courseData?.parentSeriesId ? resolveCourse({ id: courseData.parentSeriesId }) : null;
   useEffect(() => {
-    if (courseData && completion) {
+    if (studyCourse && completion) {
       setPage("certificate");
     }
-  }, [completion?.certificateId, courseData?.id, courseData?.selectedTrackKey, setPage]);
+  }, [completion?.certificateId, setPage, studyCourse?.id]);
 
   if (!courseData) return null;
 
   const handleEnroll = () => {
     if (!loggedIn) { setPage("login"); return; }
-    DB.enroll(courseData.id, { trackKey: courseData.selectedTrackKey }); setEnrolled(true);
+    const parentSeriesId = courseData.isSeries ? courseData.id : courseData.parentSeriesId || null;
+    const seriesSelectionId = courseData.isSeries
+      ? courseData.activeSeriesCourseId
+      : (courseData.parentSeriesId ? courseData.id : null);
+    if (parentSeriesId && seriesSelectionId) DB.setSeriesCourse(parentSeriesId, seriesSelectionId);
+    DB.enroll(enrollmentCourseId, {
+      trackKey: courseData.selectedTrackKey,
+      seriesChildId: courseData.isSeries ? courseData.activeSeriesCourseId : undefined,
+    });
+    setEnrolled(true);
     setPopped(true); setTimeout(() => setPopped(false), 2200);
   };
 
@@ -3855,6 +4665,11 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
     const nextLessonState = createLessonState(courseData, mi, li);
     if (!nextLessonState) return;
     setLesson(nextLessonState); setPage("lesson");
+  };
+  const openStudyPathDetail = () => {
+    if (!studyCourse) return;
+    setCourse(studyCourse);
+    setPage("course-detail");
   };
 
   const curId = null;
@@ -3866,11 +4681,25 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
         <Iso op={0.07} col={C.gold}/>
         <div className="split-grid" style={{maxWidth:1200,margin:"0 auto",gridTemplateColumns:"1fr auto",gap:34,alignItems:"start",position:"relative",zIndex:1}}>
           <div>
-            <Btn v="dark" size="sm" style={{marginBottom:14}} onClick={() => setPage("courses")}>← Back to Courses</Btn>
+            <Btn
+              v="dark"
+              size="sm"
+              style={{marginBottom:14}}
+              onClick={() => {
+                if (parentSeriesCourse) {
+                  setCourse(parentSeriesCourse);
+                  setPage("course-detail");
+                  return;
+                }
+                setPage("courses");
+              }}
+            >
+              {parentSeriesCourse ? "← Back to Series" : "← Back to Courses"}
+            </Btn>
             <div style={{display:"flex",gap:6,marginBottom:12}}>
               <Badge col={C.gold}>{courseData.category}</Badge>
               <Badge col="rgba(255,255,255,.45)">{courseData.level}</Badge>
-              {courseData.selectedTrackLabel&&<Badge col={C.gold}>{courseData.selectedTrackLabel} Track</Badge>}
+              {selectionLabel&&<Badge col={C.gold}>{selectionLabel}</Badge>}
               {courseData.isFree&&<Badge col={C.emL}>Free</Badge>}
             </div>
             <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.95rem",color:"white",marginBottom:4}}>{courseData.title}</h1>
@@ -3878,7 +4707,7 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
             <p style={{color:"rgba(255,255,255,.7)",fontSize:".93rem",lineHeight:1.75,maxWidth:560,marginBottom:15}}>{courseData.desc}</p>
             <div className="course-detail-meta" style={{display:"flex",gap:18,fontSize:".8rem",color:"rgba(255,255,255,.62)",marginBottom:15}}>
               <span>👤 {courseData.instructor}</span>
-              <span>📦 {courseData.modules.length} modules</span>
+              <span>📦 {studyCourse?.modules?.length || 0} modules</span>
               <span>📚 {tot} lessons</span>
               <span>👥 {courseData.students.toLocaleString()}</span>
             </div>
@@ -3927,32 +4756,45 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
                 </div>
                 <div style={{marginTop:8,fontSize:".69rem",lineHeight:1.55,color:C.textL}}>
                   {enrolled
-                    ? `You are enrolled in this course. Switching options updates the active study path to ${courseData.selectedTrackLabel}.`
+                    ? `You are enrolled in this course. Switching options updates the active study path to ${selectionLabel}.`
                     : "Choose which option the learner should follow before enrolling in this course."}
+                </div>
+              </div>
+            )}
+            {courseData.isSeries && (
+              <div style={{marginBottom:14,padding:"11px 12px",borderRadius:12,background:C.cream,border:`1px solid ${C.border}`}}>
+                <div style={{fontSize:".72rem",fontWeight:700,color:C.textM,letterSpacing:".06em",textTransform:"uppercase",marginBottom:6}}>Series Access</div>
+                <div style={{fontWeight:800,color:C.emD,marginBottom:4}}>{selectionLabel || "Choose a course option"}</div>
+                <div style={{fontSize:".75rem",lineHeight:1.6,color:C.textL}}>
+                  {selectionNote || "Enroll once to unlock the currently selected book inside this Urdu Madinah Arabic series."}
                 </div>
               </div>
             )}
             {!enrolled ? (
               <Btn v="gold" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={handleEnroll}>
-                {loggedIn?"🎓 Enroll Now":"🔑 Login to Enroll"}
+                {loggedIn ? (courseData.isSeries ? "🎓 Enroll in Series" : "🎓 Enroll Now") : "🔑 Login to Enroll"}
               </Btn>
             ) : (
               <div>
                 {popped&&<div style={{textAlign:"center",fontSize:"1.3rem",marginBottom:7,animation:"pop .4s ease"}}>🎉 Enrolled!</div>}
                 <Btn v="primary" style={{width:"100%",justifyContent:"center",marginBottom:8}} onClick={()=>{
+                  if (courseData.isSeries) {
+                    openStudyPathDetail();
+                    return;
+                  }
                   if (!nextLesson) return;
                   const nextLessonState = createLessonState(courseData, nextLesson.mi, nextLesson.li);
                   if (!nextLessonState) return;
                   setLesson(nextLessonState);
                   setPage("lesson");
                 }}>
-                  ▶ Resume Course
+                  ▶ {courseData.isSeries ? "Open Selected Course" : (pct > 0 ? "Resume Course" : "Start Course")}
                 </Btn>
                 <div style={{marginTop:9}}><PBar value={pct} label={`${pct}% complete`}/></div>
               </div>
             )}
             <div style={{marginTop:13,fontSize:".73rem",color:C.textL}}>
-              {["📦 "+courseData.modules.length+" modules","📚 "+tot+" lessons","📝 Personal notes","🔥 Streak tracking","📜 Certificate"].map(f=><div key={f} style={{padding:"3px 0"}}>{f}</div>)}
+              {["📦 "+(studyCourse?.modules?.length || 0)+" modules","📚 "+tot+" lessons","📝 Personal notes","🔥 Streak tracking","📜 Certificate"].map(f=><div key={f} style={{padding:"3px 0"}}>{f}</div>)}
             </div>
             {courseData.playlist && courseData.playlist!=="YOUR_PLAYLIST_ID_HERE"&&(
               <a href={`https://www.youtube.com/playlist?list=${courseData.playlist}`} target="_blank" rel="noreferrer"
@@ -3964,6 +4806,123 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
         </div>
       </div>
 
+      {courseData.isSeries ? (
+        <div style={{maxWidth:1200,margin:"0 auto",padding:"30px 5% 44px"}}>
+          <div className="split-grid" style={{gridTemplateColumns:"minmax(0,1.15fr) minmax(300px,.85fr)",gap:18,alignItems:"start",marginBottom:22}}>
+            <div style={{background:"white",borderRadius:16,padding:22,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+              <div style={{fontSize:".72rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>Choose Course Option</div>
+              <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.28rem",color:C.emD,marginBottom:10}}>Select the book you want to study inside this series</div>
+              <div style={{fontSize:".8rem",lineHeight:1.7,color:C.textM,marginBottom:15}}>
+                Each book remains a separate internal course with its own lessons, progress, and completion record. The main series enrollment unlocks the selected path below.
+              </div>
+              <div style={{display:"grid",gap:12}}>
+                {seriesChoices.map((seriesCourse, index) => {
+                  const active = String(courseData.activeSeriesCourseId) === String(seriesCourse.id);
+                  const optionStats = courseProgressStats(seriesCourse);
+                  const optionComplete = Boolean(getCourseCompletionRecord(seriesCourse));
+                  return (
+                    <button
+                      key={seriesCourse.id}
+                      type="button"
+                      onClick={() => {
+                        const nextId = String(seriesCourse.id);
+                        setSeriesChildId(nextId);
+                        if (loggedIn) DB.setSeriesCourse(courseData.id, nextId);
+                      }}
+                      style={{
+                        width:"100%",
+                        textAlign:"left",
+                        padding:"15px 16px",
+                        borderRadius:14,
+                        border:`1px solid ${active ? C.em : C.border}`,
+                        background:active ? `${C.em}0D` : "white",
+                        cursor:"pointer",
+                        transition:"all .2s",
+                      }}
+                    >
+                      <div style={{display:"flex",justifyContent:"space-between",gap:14,alignItems:"flex-start",marginBottom:7,flexWrap:"wrap"}}>
+                        <div>
+                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                            <span style={{fontSize:".68rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL}}>Option {index + 1}</span>
+                            {active&&<Badge col={C.em}>{enrolled ? "Active" : "Selected"}</Badge>}
+                            {optionComplete&&<Badge col={C.gold}>Completed</Badge>}
+                          </div>
+                          <div style={{fontWeight:800,fontSize:".92rem",color:active ? C.emD : C.text,marginBottom:4}}>{getSeriesOptionLabel(seriesCourse)}</div>
+                          <div style={{fontSize:".76rem",lineHeight:1.65,color:C.textL,maxWidth:620}}>{getSeriesOptionDescription(seriesCourse)}</div>
+                        </div>
+                        <div style={{minWidth:110,textAlign:"right"}}>
+                          <div style={{fontSize:".72rem",fontWeight:700,color:C.emD}}>{optionStats.pct}% done</div>
+                          <div style={{fontSize:".68rem",color:C.textL,marginTop:3}}>{optionStats.completed}/{optionStats.total} lessons</div>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                        <div style={{fontSize:".72rem",color:C.textM}}>
+                          {seriesCourse.modules.length} modules · {optionStats.total} lessons
+                        </div>
+                        <div style={{width:"min(220px,100%)"}}>
+                          <PBar value={optionStats.pct} label={optionComplete ? "Completed" : `${optionStats.pct}% complete`} thin/>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{background:"white",borderRadius:16,padding:22,border:`1px solid ${C.border}`,boxShadow:C.sh,position:"sticky",top:92}}>
+              <div style={{fontSize:".72rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>Active Study Path</div>
+              <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.26rem",color:C.emD,marginBottom:6}}>{selectionLabel}</div>
+              <div style={{fontSize:".8rem",lineHeight:1.7,color:C.textM,marginBottom:14}}>{selectionNote}</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,marginBottom:14}}>
+                {[
+                  { label:"Modules", value:String(studyCourse?.modules?.length || 0), color:C.em },
+                  { label:"Lessons", value:String(tot), color:C.gold },
+                  { label:"Progress", value:`${pct}%`, color:"#7C3AED" },
+                  { label:"Price", value:courseData.isFree ? "Free" : `$${courseData.price}`, color:C.green },
+                ].map(item => (
+                  <div key={item.label} style={{padding:"11px 12px",borderRadius:12,background:C.cream,border:`1px solid ${C.border}`}}>
+                    <div style={{fontSize:".67rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:5}}>{item.label}</div>
+                    <div style={{fontSize:"1.1rem",fontWeight:800,color:item.color}}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+              {enrolled ? (
+                <Btn v="primary" style={{width:"100%",justifyContent:"center",marginBottom:12}} onClick={openStudyPathDetail}>
+                  ▶ {pct > 0 ? "Resume Course" : "Start Course"}
+                </Btn>
+              ) : (
+                <Btn v="gold" style={{width:"100%",justifyContent:"center",marginBottom:12}} onClick={handleEnroll}>
+                  {loggedIn ? "🎓 Enroll in Series" : "🔑 Login to Enroll"}
+                </Btn>
+              )}
+              <PBar value={pct} label={enrolled ? `Progress: ${dn}/${tot} lessons` : "Progress will follow the selected book"} />
+              <div style={{marginTop:12,fontSize:".72rem",lineHeight:1.7,color:C.textL}}>
+                {enrolled
+                  ? "Changing the active option updates which internal book opens when the learner resumes this series."
+                  : "Choose the desired book first. Once enrolled, the same selection is remembered for this learner on this browser."}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="course-detail-heading" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,marginBottom:18}}>
+              <div>
+                <div style={{fontSize:".72rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>Series Curriculum</div>
+                <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.28rem",color:C.emD}}>{selectionLabel} Preview</h2>
+              </div>
+              {enrolled&&<Badge col={C.em}>{pct}% Complete</Badge>}
+            </div>
+            {studyCourse ? (
+              <ModuleList course={studyCourse} doneIds={completedIds} isEnrolled={enrolled} onLesson={handleLesson} curId={curId}/>
+            ) : (
+              <div style={{background:"white",borderRadius:16,padding:"26px 22px",border:`1px solid ${C.border}`,color:C.textL}}>
+                This series does not have an active study path yet.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Tabs */}
       <div style={{borderBottom:`1px solid ${C.border}`,background:"white",position:"sticky",top:64,zIndex:10}}>
         <div className="tabs-scroll" style={{maxWidth:1200,margin:"0 auto",padding:"0 5%",display:"flex"}}>
@@ -4018,6 +4977,8 @@ const CourseDetailPage = ({ course, setPage, setLesson, loggedIn }) => {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };
@@ -4030,6 +4991,7 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
     slug: lessonData?.courseSlug || lessonData?.course?.slug,
     selectedTrackKey: lessonData?.selectedTrackKey || lessonData?.course?.selectedTrackKey || null,
   });
+  const detailCourse = getCourseDetailTarget(sourceCourse);
   const initialPosition = lessonStatePosition(sourceCourse, lessonData);
   const [mi,       setMi      ] = useState(initialPosition.mi);
   const [li,       setLi      ] = useState(initialPosition.li);
@@ -4195,7 +5157,7 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
     <div style={{paddingTop:64,background:"#0C0C0C",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
       {/* Top bar */}
       <div className="lesson-topbar" style={{background:C.emD,padding:"8px 18px",display:"flex",alignItems:"center",gap:11,borderBottom:"1px solid rgba(255,255,255,.06)",flexShrink:0}}>
-        <button onClick={()=>{ setCourse(course); setPage("course-detail"); }} style={{background:"none",border:"none",color:"rgba(255,255,255,.52)",cursor:"pointer",fontSize:".78rem",fontFamily:"'Nunito Sans',sans-serif",flexShrink:0}}>← Back</button>
+        <button onClick={()=>{ setCourse(detailCourse || course); setPage("course-detail"); }} style={{background:"none",border:"none",color:"rgba(255,255,255,.52)",cursor:"pointer",fontSize:".78rem",fontFamily:"'Nunito Sans',sans-serif",flexShrink:0}}>← Back</button>
         <span style={{color:"rgba(255,255,255,.18)"}}>|</span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{color:"white",fontSize:".82rem",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{course.title}</div>
@@ -4506,7 +5468,7 @@ const LessonPage = ({ lessonData, setPage, setLesson, setCourse }) => {
 
 // ─── STUDENT DASHBOARD ────────────────────────────────────────────────────────
 const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdated }) => {
-  const courseCatalog = getCourseCatalog();
+  const courseCatalog = getCourseCatalog({ includeHidden:true });
   const [sec,         setSec        ] = useState("overview");
   const [courses,     setCourses    ] = useState([]);
   const [allProg,     setAllProg    ] = useState({});
@@ -4521,6 +5483,16 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
   });
   const [profileMsg,  setProfileMsg ] = useState("");
   const [copyMsg,     setCopyMsg    ] = useState("");
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [supportForm, setSupportForm] = useState({
+    category: "Course Help",
+    courseId: "",
+    subject: "",
+    message: "",
+    screenshot: null,
+  });
+  const [supportMsg, setSupportMsg] = useState({ type:"", text:"" });
+  const [supportAttachmentBusy, setSupportAttachmentBusy] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -4535,12 +5507,13 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
   useEffect(() => {
     if (!currentUser) return;
     const sync = () => {
-      const catalog = getCourseCatalog();
+      const catalog = getCourseCatalog({ includeHidden:true });
       setCourses(catalog.filter(c => DB.enrolled().includes(c.id)).map(c => resolveCourse(c)));
       setAllProg(DB.allProgress());
       setNotes(DB.allNotes());
       setStreak(DB.streak());
       setCompletions(DB.allCompletions());
+      setSupportTickets(SupportDB.forUser(currentUser.id));
     };
     sync();
     window.addEventListener("nur:data", sync);
@@ -4553,14 +5526,19 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
   const notesCount = Object.values(notes).filter(n=>n.trim()).length;
   const initials   = getInitials(currentUser.name);
   const firstName  = currentUser.name.split(" ")[0] || "Student";
-  const completedCourses = courses.filter(c => Boolean(completions[String(c.id)]));
+  const completedCourseEntries = courses.flatMap(c => getCourseCertificateEntries(c));
+  const activeSupportCount = supportTickets.filter(ticket => ticket.status !== "resolved").length;
+  const nextCourse = courses.find(item => {
+    const progress = courseProgressStats(item);
+    return progress.total > 0 && progress.pct < 100;
+  }) || courses[0] || null;
+  const selectedSupportCourse = courses.find(item => String(item.id) === String(supportForm.courseId));
 
   const sideItems = [
     {icon:"📊",l:"Overview",k:"overview"},
     {icon:"📚",l:"My Courses",k:"courses"},
-    {icon:"🔥",l:"Streak",k:"streak"},
-    {icon:"📝",l:"My Notes",k:"notes"},
     {icon:"🏆",l:"Certificates",k:"certs"},
+    {icon:"🛟",l:"Support",k:"support"},
     {icon:"👤",l:"Profile",k:"profile"},
   ];
 
@@ -4592,10 +5570,57 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
     try {
       const updatedUser = Auth.updateCurrentProfile(profile);
       onUserUpdated(updatedUser);
-      setProfileMsg("Profile saved on this browser.");
+      setProfileMsg("Profile updated successfully.");
       window.setTimeout(() => setProfileMsg(""), 2200);
     } catch (error) {
       setProfileMsg(error.message);
+    }
+  };
+  const handleSupportScreenshotChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setSupportAttachmentBusy(true);
+    try {
+      const screenshot = await prepareSupportScreenshot(file);
+      setSupportForm(form => ({ ...form, screenshot }));
+      setSupportMsg({ type:"", text:"" });
+    } catch (error) {
+      setSupportMsg({ type:"error", text:error.message });
+    } finally {
+      setSupportAttachmentBusy(false);
+    }
+  };
+  const handleRemoveSupportScreenshot = () => {
+    setSupportForm(form => ({ ...form, screenshot:null }));
+  };
+  const handleSupportSubmit = async (event) => {
+    event.preventDefault();
+    if (supportAttachmentBusy) {
+      setSupportMsg({ type:"error", text:"Please wait while the screenshot finishes preparing." });
+      return;
+    }
+    try {
+      SupportDB.submit({
+        user: currentUser,
+        category: supportForm.category,
+        courseId: supportForm.courseId,
+        courseTitle: selectedSupportCourse?.title || "",
+        subject: supportForm.subject,
+        message: supportForm.message,
+        screenshot: supportForm.screenshot,
+      });
+      setSupportForm({
+        category: supportForm.category,
+        courseId: "",
+        subject: "",
+        message: "",
+        screenshot: null,
+      });
+      setSupportMsg({ type:"success", text:"Your support request has been saved in the academy workspace." });
+      window.setTimeout(() => setSupportMsg({ type:"", text:"" }), 2400);
+    } catch (error) {
+      setSupportMsg({ type:"error", text:error.message });
     }
   };
 
@@ -4618,6 +5643,10 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
             <span>{it.icon}</span>{it.l}
           </div>
         ))}
+        <div style={{marginTop:12,padding:"12px 10px",borderRadius:14,background:C.cream,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:".68rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:8}}>Learning Hub</div>
+          <Btn v="gold" style={{width:"100%",justifyContent:"center"}} onClick={()=>setPage("courses")}>Browse All Courses</Btn>
+        </div>
         <div style={{borderTop:`1px solid ${C.border}`,marginTop:13,paddingTop:9}}>
           <div className="sL" style={{color:C.red}} onClick={onSignOut}><span>🚪</span>Sign Out</div>
         </div>
@@ -4631,11 +5660,11 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
           <div className="page">
             <div style={{marginBottom:20}}>
               <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.6rem",color:C.emD}}>السلام عليكم، {firstName}! 👋</h1>
-              <p style={{color:C.textL,fontSize:".83rem",marginTop:3}}>Track your learning, streak, certificates, and notes in one place.</p>
+              <p style={{color:C.textL,fontSize:".83rem",marginTop:3}}>Welcome back to your Nur Academy learning space. Continue lessons, review certificates, and keep your study rhythm strong.</p>
             </div>
             {/* Stats */}
             <div className="grid-4" style={{gridTemplateColumns:"repeat(4,1fr)",gap:13,marginBottom:15}}>
-              {[{icon:"📚",l:"Enrolled",v:courses.length,col:C.em},{icon:"✅",l:"Lessons Done",v:totalDone,col:C.green},{icon:"🔥",l:"Day Streak",v:streak.count||0,col:C.gold},{icon:"🏆",l:"Certificates",v:completedCourses.length,col:"#7C3AED"}].map((s,i)=>(
+              {[{icon:"📚",l:"Enrolled",v:courses.length,col:C.em},{icon:"✅",l:"Lessons Done",v:totalDone,col:C.green},{icon:"🔥",l:"Study Streak",v:streak.count||0,col:C.gold},{icon:"🏆",l:"Certificates",v:completedCourseEntries.length,col:"#7C3AED"}].map((s,i)=>(
                 <div key={i} style={{background:"white",borderRadius:12,padding:16,border:`1px solid ${C.border}`,boxShadow:"0 2px 8px rgba(11,82,64,.05)"}}>
                   <div style={{fontSize:"1.3rem",marginBottom:5}}>{s.icon}</div>
                   <div style={{fontSize:"1.35rem",fontWeight:800,color:s.col}}>{s.v}</div>
@@ -4643,13 +5672,61 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                 </div>
               ))}
             </div>
-            <div style={{background:"white",borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:22}}>
-              <div style={{fontWeight:700,fontSize:".82rem",color:C.emD,marginBottom:4}}>Browser-hosted access</div>
-              <div style={{fontSize:".78rem",color:C.textL,lineHeight:1.65}}>
-                Accounts, notes, progress, streaks, and certificates are currently stored in this browser so the platform can run as a static deployment. When you connect your backend, this same UI can use real hosted authentication and database storage.
+            <div style={{background:"white",borderRadius:18,padding:"18px 20px",border:`1px solid ${C.border}`,marginBottom:18,boxShadow:C.sh}}>
+              <div className="course-detail-heading" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,marginBottom:15}}>
+                <div>
+                  <div style={{fontSize:".72rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>Today in the Academy</div>
+                  <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.32rem",color:C.emD,marginBottom:5}}>
+                    {nextCourse ? `Continue ${nextCourse.title}` : "Begin your first course"}
+                  </div>
+                  <div style={{fontSize:".8rem",lineHeight:1.65,color:C.textM,maxWidth:620}}>
+                    {nextCourse
+                      ? "Your dashboard keeps the next lesson, certificates, and support requests in one place so you can study without losing momentum."
+                      : "Browse the library, enroll in a course, and your learning path will appear here automatically."}
+                  </div>
+                </div>
+                <div className="action-row" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                  <Btn v="primary" onClick={()=>nextCourse ? openLesson(nextCourse) : setPage("courses")}>{nextCourse ? "Resume Learning" : "Browse Courses"}</Btn>
+                  <Btn v="outline" onClick={()=>setSec("certs")}>View Certificates</Btn>
+                  <Btn v="gold" onClick={()=>setSec("support")}>Get Support</Btn>
+                </div>
+              </div>
+              <div className="grid-3" style={{gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12}}>
+                {[
+                  { title:"Study Notes", value:notesCount, detail:notesCount ? "Saved across your lessons" : "Start taking notes inside lessons", color:C.em },
+                  { title:"Active Support", value:activeSupportCount, detail:activeSupportCount ? "Requests awaiting follow-up" : "No open support requests", color:C.gold },
+                  { title:"Course Status", value:nextCourse ? `${courseProgressStats(nextCourse).pct}%` : "Ready", detail:nextCourse ? `${nextCourse.modules.length} modules in progress` : "Enroll to unlock your dashboard flow", color:"#7C3AED" },
+                ].map(card => (
+                  <div key={card.title} style={{padding:"13px 14px",borderRadius:14,background:C.cream,border:`1px solid ${C.border}`}}>
+                    <div style={{fontSize:".68rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>{card.title}</div>
+                    <div style={{fontSize:"1.4rem",fontWeight:800,color:card.color,marginBottom:4}}>{card.value}</div>
+                    <div style={{fontSize:".76rem",lineHeight:1.6,color:C.textM}}>{card.detail}</div>
+                  </div>
+                ))}
               </div>
             </div>
-            <div style={{marginBottom:22}}><StreakWidget big/></div>
+            <div className="split-grid" style={{gridTemplateColumns:"minmax(0,1.05fr) minmax(0,.95fr)",gap:16,marginBottom:22}}>
+              <div><StreakWidget big/></div>
+              <div style={{background:"white",borderRadius:16,padding:22,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+                <div style={{fontSize:".72rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>Student Workspace</div>
+                <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.22rem",color:C.emD,marginBottom:10}}>A cleaner way to keep learning</div>
+                <div style={{display:"grid",gap:12}}>
+                  {[
+                    { icon:"📖", title:"Continue where you stopped", detail:"Your enrolled courses remember progress and open back into the player quickly." },
+                    { icon:"🏆", title:"Certificates stay organized", detail:"Eligible course completions remain available from one certificates section." },
+                    { icon:"🛟", title:"Support stays attached to your account", detail:"Send course or certificate issues from inside the dashboard whenever you need help." },
+                  ].map(item => (
+                    <div key={item.title} style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                      <div style={{width:38,height:38,borderRadius:12,background:`${C.em}10`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.05rem",flexShrink:0}}>{item.icon}</div>
+                      <div>
+                        <div style={{fontWeight:800,fontSize:".82rem",color:C.emD,marginBottom:3}}>{item.title}</div>
+                        <div style={{fontSize:".76rem",lineHeight:1.6,color:C.textM}}>{item.detail}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
             <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.18rem",color:C.emD,marginBottom:13}}>Continue Learning</h2>
             {courses.length===0 ? (
               <div style={{background:"white",borderRadius:12,padding:26,textAlign:"center",border:`1px solid ${C.border}`}}>
@@ -4663,6 +5740,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                   const tot = stats.total;
                   const dn  = stats.completed;
                   const pct = stats.pct;
+                  const selectionLabel = getCourseSelectionLabel(c);
                   return (
                     <div key={c.id} style={{background:"white",borderRadius:12,padding:16,border:`1px solid ${C.border}`,cursor:"pointer",transition:"box-shadow .2s"}}
                       onClick={()=>openLesson(c)}
@@ -4672,7 +5750,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                         <div style={{width:40,height:40,borderRadius:8,background:`${c.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.15rem"}}>{c.thumb}</div>
                         <div>
                           <div style={{fontWeight:700,fontSize:".84rem"}}>{c.title}</div>
-                          <div style={{fontSize:".68rem",color:C.textL}}>{c.modules.length} modules · {tot} lessons{c.selectedTrackLabel ? ` · ${c.selectedTrackLabel}` : ""}</div>
+                          <div style={{fontSize:".68rem",color:C.textL}}>{c.modules.length} modules · {tot} lessons{selectionLabel ? ` · ${selectionLabel}` : ""}</div>
                         </div>
                       </div>
                       <PBar value={pct} label={`${dn}/${tot} lessons`}/>
@@ -4700,6 +5778,8 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                   const tot = stats.total;
                   const dn  = stats.completed;
                   const pct = stats.pct;
+                  const selectionLabel = getCourseSelectionLabel(c);
+                  const progressIds = getCourseProgressIds(c);
                   return (
                     <div key={c.id} style={{background:"white",borderRadius:12,overflow:"hidden",border:`1px solid ${C.border}`}}>
                       <div style={{height:68,background:`linear-gradient(135deg,${c.color},${c.color}80)`,display:"flex",alignItems:"center",padding:"0 18px",gap:13,position:"relative"}}>
@@ -4707,7 +5787,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                         <span style={{fontSize:"1.6rem",position:"relative",zIndex:1}}>{c.thumb}</span>
                         <div style={{position:"relative",zIndex:1,flex:1}}>
                           <div style={{color:"white",fontWeight:700,fontSize:".9rem"}}>{c.title}</div>
-                          <div style={{color:"rgba(255,255,255,.5)",fontSize:".7rem"}}>{c.instructor} · {c.modules.length} modules{c.selectedTrackLabel ? ` · ${c.selectedTrackLabel}` : ""}</div>
+                          <div style={{color:"rgba(255,255,255,.5)",fontSize:".7rem"}}>{c.instructor} · {c.modules.length} modules{selectionLabel ? ` · ${selectionLabel}` : ""}</div>
                         </div>
                         {pct===100&&<div style={{position:"relative",zIndex:1}}><Badge col="white">✅ Complete</Badge></div>}
                       </div>
@@ -4716,7 +5796,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                         {/* Module breakdown */}
                         <div style={{marginTop:10,display:"flex",gap:5,flexWrap:"wrap"}}>
                           {c.modules.map(mod=>{
-                            const mDn = mod.lessons.filter(l=>DB.progress(c.id).includes(l.id)).length;
+                            const mDn = mod.lessons.filter(l=>progressIds.includes(l.id)).length;
                             const mPct = Math.round(mDn/mod.lessons.length*100);
                             return (
                               <div key={mod.id} style={{padding:"3px 9px",borderRadius:7,background:C.creamD,fontSize:".68rem",color:C.textM}}>
@@ -4811,7 +5891,7 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
         {sec==="certs"&&(
           <div className="page">
             <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.6rem",color:C.emD,marginBottom:18}}>🏆 Certificates</h1>
-            {completedCourses.length===0 ? (
+            {completedCourseEntries.length===0 ? (
               <div style={{background:"white",borderRadius:12,padding:32,textAlign:"center",border:`1px solid ${C.border}`}}>
                 <div style={{fontSize:"2.3rem",marginBottom:11}}>🏆</div>
                 <div style={{fontWeight:600,marginBottom:5}}>No certificates yet</div>
@@ -4823,13 +5903,16 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
               </div>
             ) : (
               <>
-                {completedCourses.map(c=>{
-                  const completion = completions[String(c.id)] || {
+                {completedCourseEntries.map(entry=>{
+                  const certificateCourse = entry.certificateCourse;
+                  const displayCourse = entry.displayCourse;
+                  const completion = entry.completion || {
                     completedAt: dayKey(),
-                    certificateId: `NUR-${String(c.id).padStart(3, "0")}-${dayKey().replaceAll("-", "")}-${currentUser.id.slice(-4).toUpperCase()}`,
+                    certificateId: `NUR-${String(certificateCourse?.id || displayCourse.id).padStart(3, "0")}-${dayKey().replaceAll("-", "")}-${currentUser.id.slice(-4).toUpperCase()}`,
                   };
+                  const selectionLabel = entry.selectionLabel;
                   return (
-                    <div key={c.id} style={{background:"white",borderRadius:14,border:`2px solid ${C.gold}32`,overflow:"hidden",marginBottom:18,boxShadow:C.shG}}>
+                    <div key={entry.key} style={{background:"white",borderRadius:14,border:`2px solid ${C.gold}32`,overflow:"hidden",marginBottom:18,boxShadow:C.shG}}>
                       <div style={{background:`linear-gradient(135deg,${C.emD},${C.em})`,padding:"22px 34px",position:"relative",overflow:"hidden"}}>
                         <Iso op={0.1} col={C.gold}/>
                         <div style={{position:"relative",zIndex:1,textAlign:"center"}}>
@@ -4842,8 +5925,8 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                           <div style={{color:C.textL,fontSize:".78rem",marginBottom:5}}>This certifies that</div>
                         <div style={{fontFamily:"'Amiri',serif",fontSize:"1.35rem",color:C.emD,fontWeight:700}}>{currentUser.name}</div>
                         <div style={{color:C.textL,fontSize:".78rem",margin:"5px 0"}}>has successfully completed</div>
-                        <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.08rem",color:C.gold,fontWeight:700}}>{c.title}</div>
-                        {c.selectedTrackLabel&&<div style={{fontSize:".74rem",color:C.textL,marginTop:4}}>{c.selectedTrackLabel} Track</div>}
+                        <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.08rem",color:C.gold,fontWeight:700}}>{certificateCourse?.title || displayCourse.title}</div>
+                        {selectionLabel&&<div style={{fontSize:".74rem",color:C.textL,marginTop:4}}>{selectionLabel}</div>}
                       </div>
                       <div style={{display:"flex",justifyContent:"space-between",fontSize:".7rem",color:C.textL}}>
                           <span>📅 {formatDay(completion.completedAt)}</span>
@@ -4851,10 +5934,10 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
                         </div>
                       </div>
                       <div className="dashboard-cert-footer" style={{padding:"11px 34px",background:"white",display:"flex",gap:8,justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`}}>
-                        <div style={{fontSize:".72rem",color:copyMsg?C.green:C.textL}}>{copyMsg || "Print now on GitHub Pages. Later, Railway can issue server-verified certificates."}</div>
+                        <div style={{fontSize:".72rem",color:copyMsg?C.green:C.textL}}>{copyMsg || "Save or print your certificate directly from this learner workspace."}</div>
                         <div className="action-row" style={{display:"flex",gap:8}}>
                           <Btn size="sm" v="outline" onClick={()=>handleCopyId(completion.certificateId)}>🔑 Copy ID</Btn>
-                          <Btn size="sm" v="gold" onClick={()=>printCertificate(c, currentUser, completion)}>🖨 Print / Save PDF</Btn>
+                          <Btn size="sm" v="gold" onClick={()=>printCertificate(certificateCourse || c, currentUser, completion)}>🖨 Print / Save PDF</Btn>
                         </div>
                     </div>
                   </div>
@@ -4867,17 +5950,145 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
           </div>
         )}
 
+        {/* ── Support ── */}
+        {sec==="support"&&(
+          <div className="page">
+            <div className="admin-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+              <div>
+                <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.6rem",color:C.emD,marginBottom:5}}>Support & Requests</h1>
+                <div style={{fontSize:".82rem",color:C.textL,lineHeight:1.65,maxWidth:680}}>
+                  Need help with a lesson, certificate, login, or course request? Send it from here and keep all academy follow-up attached to your student account.
+                </div>
+              </div>
+              <Btn v="outline" onClick={()=>setPage("contact")}>Open Public Contact Page</Btn>
+            </div>
+            <div style={{background:"white",borderRadius:14,padding:"12px 14px",border:`1px solid ${C.border}`,boxShadow:C.sh,marginBottom:16,fontSize:".78rem",lineHeight:1.7,color:C.textM}}>
+              Support requests are currently stored in this browser profile only. They will appear for the admin if both student and admin use the same browser data on this device; cross-device and cross-browser syncing needs the backend.
+            </div>
+            <div className="grid-2" style={{gridTemplateColumns:"minmax(320px,420px) 1fr",gap:16}}>
+              <form onSubmit={handleSupportSubmit} style={{background:"white",borderRadius:16,padding:22,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+                <div style={{fontSize:".72rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>New Request</div>
+                <div style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.28rem",color:C.emD,marginBottom:14}}>Send a message to the academy</div>
+                <div style={{marginBottom:12}}>
+                  <label style={{display:"block",fontSize:".69rem",fontWeight:700,color:C.textL,letterSpacing:".08em",textTransform:"uppercase",marginBottom:6}}>Category</label>
+                  <select value={supportForm.category} onChange={event => setSupportForm(form => ({ ...form, category:event.target.value }))} style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1px solid ${C.border}`,background:C.cream,fontSize:".84rem"}}>
+                    {SUPPORT_CATEGORY_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </div>
+                <div style={{marginBottom:12}}>
+                  <label style={{display:"block",fontSize:".69rem",fontWeight:700,color:C.textL,letterSpacing:".08em",textTransform:"uppercase",marginBottom:6}}>Course</label>
+                  <select value={supportForm.courseId} onChange={event => setSupportForm(form => ({ ...form, courseId:event.target.value }))} style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1px solid ${C.border}`,background:C.cream,fontSize:".84rem"}}>
+                    <option value="">General academy request</option>
+                    {courses.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+                  </select>
+                </div>
+                <div style={{marginBottom:12}}>
+                  <label style={{display:"block",fontSize:".69rem",fontWeight:700,color:C.textL,letterSpacing:".08em",textTransform:"uppercase",marginBottom:6}}>Subject</label>
+                  <input value={supportForm.subject} onChange={event => setSupportForm(form => ({ ...form, subject:event.target.value }))} placeholder="Short summary of your issue" style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1px solid ${C.border}`,background:C.cream,fontSize:".84rem"}} />
+                </div>
+                <div style={{marginBottom:14}}>
+                  <label style={{display:"block",fontSize:".69rem",fontWeight:700,color:C.textL,letterSpacing:".08em",textTransform:"uppercase",marginBottom:6}}>Message</label>
+                  <textarea rows={7} value={supportForm.message} onChange={event => setSupportForm(form => ({ ...form, message:event.target.value }))} placeholder="Explain what happened and what kind of help you need." style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1px solid ${C.border}`,background:C.cream,fontSize:".84rem",resize:"vertical",lineHeight:1.65}} />
+                </div>
+                <div style={{marginBottom:14}}>
+                  <label style={{display:"block",fontSize:".69rem",fontWeight:700,color:C.textL,letterSpacing:".08em",textTransform:"uppercase",marginBottom:6}}>Screenshot (Optional)</label>
+                  <div style={{padding:"12px 13px",borderRadius:12,border:`1px solid ${C.border}`,background:C.cream}}>
+                    <input type="file" accept={SUPPORT_SCREENSHOT_INPUT_ACCEPT} onChange={handleSupportScreenshotChange} style={{width:"100%",fontSize:".8rem"}} />
+                    <div style={{marginTop:7,fontSize:".74rem",lineHeight:1.65,color:C.textL}}>
+                      Upload a PNG, JPG, or WebP screenshot to help explain the issue. The image is compressed before being saved on this browser.
+                    </div>
+                    {supportAttachmentBusy && <div style={{marginTop:8,fontSize:".76rem",fontWeight:700,color:C.em}}>Preparing screenshot...</div>}
+                    {supportForm.screenshot && (
+                      <div style={{marginTop:12,padding:"10px 11px",borderRadius:12,background:"white",border:`1px solid ${C.border}`}}>
+                        <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
+                          <div style={{fontSize:".74rem",fontWeight:700,color:C.emD}}>Attached: {supportForm.screenshot.name}</div>
+                          <Btn size="sm" v="ghost" onClick={handleRemoveSupportScreenshot}>Remove</Btn>
+                        </div>
+                        <img src={supportForm.screenshot.dataUrl} alt="Support screenshot preview" style={{width:"100%",maxHeight:220,objectFit:"cover",borderRadius:10,border:`1px solid ${C.border}`,display:"block"}} />
+                        <div style={{marginTop:7,fontSize:".72rem",color:C.textL}}>
+                          {formatBytes(supportForm.screenshot.size)}
+                          {supportForm.screenshot.width && supportForm.screenshot.height ? ` · ${supportForm.screenshot.width} × ${supportForm.screenshot.height}` : ""}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {supportMsg.text&&<div style={{marginBottom:12,fontSize:".78rem",color:supportMsg.type==="error"?C.red:C.green}}>{supportMsg.text}</div>}
+                <Btn type="submit" v="primary" disabled={supportAttachmentBusy} style={{width:"100%",justifyContent:"center"}}>{supportAttachmentBusy ? "Preparing Screenshot..." : "Submit Support Request"}</Btn>
+              </form>
+              <div style={{display:"grid",gap:14}}>
+                <div style={{background:"white",borderRadius:16,padding:20,border:`1px solid ${C.border}`,boxShadow:C.sh}}>
+                  <div style={{fontSize:".72rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:6}}>Request Summary</div>
+                  <div className="grid-3" style={{gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+                    {[
+                      { label:"Total", value:supportTickets.length, color:C.em },
+                      { label:"Open", value:supportTickets.filter(ticket => ticket.status === "open").length, color:C.gold },
+                      { label:"Resolved", value:supportTickets.filter(ticket => ticket.status === "resolved").length, color:C.green },
+                    ].map(item => (
+                      <div key={item.label} style={{padding:"11px 12px",borderRadius:12,background:C.cream,border:`1px solid ${C.border}`}}>
+                        <div style={{fontSize:".68rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:5}}>{item.label}</div>
+                        <div style={{fontSize:"1.2rem",fontWeight:800,color:item.color}}>{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{display:"grid",gap:12}}>
+                  {supportTickets.length===0 ? (
+                    <div style={{background:"white",borderRadius:16,padding:28,textAlign:"center",border:`1px solid ${C.border}`}}>
+                      <div style={{fontSize:"2rem",marginBottom:10}}>🛟</div>
+                      <div style={{fontWeight:700,color:C.emD,marginBottom:5}}>No support requests yet</div>
+                      <div style={{fontSize:".8rem",color:C.textL,lineHeight:1.65}}>When you send a request, it will appear here with its current status and any admin response.</div>
+                    </div>
+                  ) : supportTickets.map(ticket => {
+                    const statusMeta = SUPPORT_STATUS_META[ticket.status] || SUPPORT_STATUS_META.open;
+                    return (
+                      <div key={ticket.id} style={{background:"white",borderRadius:16,padding:18,border:`1px solid ${C.border}`,boxShadow:"0 6px 24px rgba(11,82,64,.06)"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"flex-start",marginBottom:10}}>
+                          <div>
+                            <div style={{fontWeight:800,color:C.emD,marginBottom:3}}>{ticket.subject}</div>
+                            <div style={{fontSize:".74rem",color:C.textL}}>
+                              {ticket.courseTitle ? `${ticket.courseTitle} · ` : ""}{ticket.category} · {formatDateTime(ticket.createdAt)}
+                            </div>
+                          </div>
+                          <Badge col={statusMeta.color}>{statusMeta.label}</Badge>
+                        </div>
+                        <div style={{fontSize:".82rem",lineHeight:1.7,color:C.textM,whiteSpace:"pre-wrap",marginBottom:12}}>{ticket.message}</div>
+                        {ticket.screenshot && (
+                          <div style={{marginBottom:12}}>
+                            <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
+                              <div style={{fontSize:".68rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL}}>Attached Screenshot</div>
+                              <a href={ticket.screenshot.dataUrl} target="_blank" rel="noreferrer" style={{fontSize:".74rem",fontWeight:700,color:C.em,textDecoration:"none"}}>Open Full Image</a>
+                            </div>
+                            <img src={ticket.screenshot.dataUrl} alt={`Support screenshot for ${ticket.subject}`} style={{width:"100%",maxHeight:240,objectFit:"cover",borderRadius:12,border:`1px solid ${C.border}`,display:"block",marginBottom:6}} />
+                            <div style={{fontSize:".72rem",color:C.textL}}>{ticket.screenshot.name} · {formatBytes(ticket.screenshot.size)}</div>
+                          </div>
+                        )}
+                        <div style={{padding:"10px 12px",borderRadius:12,background:C.cream,border:`1px solid ${C.border}`}}>
+                          <div style={{fontSize:".68rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:5}}>Admin Follow-Up</div>
+                          <div style={{fontSize:".78rem",lineHeight:1.65,color:C.textM}}>
+                            {ticket.adminNote || "No internal follow-up has been added yet. The academy team will update the status once this request is reviewed."}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Profile ── */}
         {sec==="profile"&&(
           <div className="page" style={{maxWidth:520}}>
-            <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.6rem",color:C.emD,marginBottom:18}}>My Profile</h1>
+            <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.6rem",color:C.emD,marginBottom:18}}>Student Profile</h1>
             <div style={{background:"white",borderRadius:14,padding:26,border:`1px solid ${C.border}`}}>
               <div className="profile-head" style={{display:"flex",gap:15,alignItems:"center",marginBottom:22}}>
                 <div style={{width:66,height:66,borderRadius:"50%",background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:"1.4rem",fontWeight:700}}>{initials}</div>
                 <div>
                   <div style={{fontWeight:700,fontSize:".98rem"}}>{currentUser.name}</div>
                   <div style={{color:C.textL,fontSize:".78rem"}}>Student since {formatDay(currentUser.joinedAt || dayKey(), { year:"numeric", month:"short" })}</div>
-                  <div style={{marginTop:6,fontSize:".72rem",color:C.textL}}>Stored in this browser for now until your hosted backend is connected.</div>
+                  <div style={{marginTop:6,fontSize:".72rem",color:C.textL}}>Keep your account details up to date so certificates and support replies stay accurate.</div>
                 </div>
               </div>
               {[["Full Name","name"],["Email","email"],["Country","country"],["Language","language"]].map(([l,key])=>(
@@ -4898,10 +6109,34 @@ const DashboardPage = ({ setPage, setLesson, currentUser, onSignOut, onUserUpdat
   );
 };
 
+// ─── Google SVG ────────────────────────────────────────────────────────────────
+const GoogleIcon = () => (
+  <svg style={{width:18,height:18,flexShrink:0}} viewBox="0 0 24 24">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </svg>
+);
+
+const signInWithGoogle = async () => {
+  if (!supabase) {
+    alert("Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.");
+    return;
+  }
+  const redirectTo = window.location.origin + "/";
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo },
+  });
+  if (error) alert(error.message);
+};
+
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 const LoginPage = ({ setPage, onLogin }) => {
   const rememberedEmail = ls.get(K.LOGIN_EMAIL, "") || "";
   const [form, setForm] = useState({ email:rememberedEmail, password:"" });
+  const [accessMode, setAccessMode] = useState("student");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberEmail, setRememberEmail] = useState(Boolean(rememberedEmail));
   const [loading, setLoading] = useState(false);
@@ -4918,6 +6153,10 @@ const LoginPage = ({ setPage, onLogin }) => {
     setNotice("");
     try {
       const user = await Auth.login(form);
+      if (accessMode === "admin" && user.role !== "admin") {
+        Auth.signOut();
+        throw new Error("This account does not have admin access. Use student sign in or contact the academy.");
+      }
       if (rememberEmail) ls.set(K.LOGIN_EMAIL, user.email);
       else ls.remove(K.LOGIN_EMAIL);
       await wait(250);
@@ -4959,169 +6198,246 @@ const LoginPage = ({ setPage, onLogin }) => {
       setForm({ email: updatedUser.email, password: "" });
       setResetForm({ email: updatedUser.email, password: "", confirm: "" });
       setForgotOpen(false);
-      setNotice("Password updated on this browser. Sign in with your new password.");
+      setNotice("Password updated. Sign in with your new password.");
     } catch (err) {
       setResetError(err.message);
     } finally {
       setResetLoading(false);
     }
   };
+  const authFeatures = accessMode === "admin"
+    ? [
+      { title:"Operational control", detail:"Review learners, manage course visibility, and inspect certificates." },
+      { title:"Protected access", detail:"Admin accounts are assigned by the academy and are not created from public signup." },
+      { title:"LMS workspace", detail:"Move from overview to users, courses, certificates, and support in one flow." },
+    ]
+    : [
+      { title:"Structured learning", detail:"Enroll in courses, resume lessons, and keep your progress together." },
+      { title:"Certificates", detail:"Eligible completions unlock downloadable certificates from your dashboard." },
+      { title:"Direct support", detail:"Send course or certificate requests from inside the academy workspace." },
+    ];
 
   return (
-    <div className="page" style={{paddingTop:64,minHeight:"100vh",background:`linear-gradient(160deg,${C.emD},${C.em})`,display:"flex",alignItems:"center",justifyContent:"center",padding:"64px 20px 36px",position:"relative"}}>
+    <div className="page" style={{paddingTop:64,minHeight:"100vh",background:`linear-gradient(160deg,${C.emD},${C.em})`,padding:"92px 20px 40px",position:"relative",overflow:"hidden"}}>
       <Iso op={0.06} col={C.gold}/>
-      <div className="auth-card" style={{background:"white",borderRadius:20,padding:38,maxWidth:460,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
-        <div style={{textAlign:"center",marginBottom:22}}>
-          <div style={{width:46,height:46,borderRadius:11,background:`linear-gradient(135deg,${C.em},${C.gold})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 9px"}}>
-            <svg width="23" height="23" viewBox="0 0 22 22"><polygon points="11,2 13,8 19,8 14,12 16,18 11,14 6,18 8,12 3,8 9,8" fill="white"/></svg>
-          </div>
-          <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.45rem",color:C.emD}}>Secure Sign In</h1>
-          <p style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".88rem"}}>دخول آمن للمتعلمين والإدارة</p>
-          <div style={{marginTop:10,display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8}}>
-            {[
-              { label:"Student", text:"Courses, notes, progress" },
-              { label:"Admin", text:"Users, courses, certificates" },
-              { label:"Browser Sync", text:"Saved on this device" },
-            ].map(item => (
-              <div key={item.label} style={{padding:"9px 10px",borderRadius:10,background:C.cream,border:`1px solid ${C.border}`}}>
-                <div style={{fontSize:".66rem",fontWeight:800,color:C.emD,textTransform:"uppercase",letterSpacing:".05em",marginBottom:3}}>{item.label}</div>
-                <div style={{fontSize:".68rem",color:C.textL,lineHeight:1.45}}>{item.text}</div>
+      <div className="split-grid" style={{maxWidth:1120,margin:"0 auto",gridTemplateColumns:"1.05fr minmax(360px,460px)",gap:28,alignItems:"center",position:"relative",zIndex:1}}>
+        <div style={{color:"white"}}>
+          <Badge col={C.gold}>{accessMode === "admin" ? "Nur Academy Admin Access" : "Nur Academy Student Portal"}</Badge>
+          <h1 style={{fontFamily:"'Amiri',serif",fontSize:"clamp(2.2rem,5vw,3.5rem)",lineHeight:1.08,margin:"16px 0 8px"}}>
+            {accessMode === "admin" ? "Enter the academy control room" : "Return to your learning journey"}
+          </h1>
+          <p style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:"1rem",marginBottom:16}}>
+            {accessMode === "admin" ? "لوحة إدارة نور أكاديمي" : "بوابة الطالب في نور أكاديمي"}
+          </p>
+          <p style={{maxWidth:640,color:"rgba(255,255,255,.78)",lineHeight:1.8,fontSize:".95rem",marginBottom:18}}>
+            {accessMode === "admin"
+              ? "Sign in with your assigned academy admin account to manage students, courses, certificates, and support in one clean workspace."
+              : "Sign in to continue courses, track progress, open certificates, and stay connected to your Nur Academy learning path."}
+          </p>
+          <div className="grid-3" style={{gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12}}>
+            {authFeatures.map(item => (
+              <div key={item.title} style={{padding:"16px 16px 14px",borderRadius:18,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",backdropFilter:"blur(10px)"}}>
+                <div style={{fontSize:".74rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.gold,marginBottom:7}}>{item.title}</div>
+                <div style={{fontSize:".82rem",lineHeight:1.7,color:"rgba(255,255,255,.74)"}}>{item.detail}</div>
               </div>
             ))}
           </div>
+          <div style={{marginTop:18,padding:"15px 16px",borderRadius:18,background:"rgba(201,168,76,.1)",border:"1px solid rgba(201,168,76,.22)",maxWidth:520}}>
+            <div style={{fontSize:".7rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.gold,marginBottom:6}}>Role Structure</div>
+            <div style={{fontSize:".82rem",lineHeight:1.7,color:"rgba(255,255,255,.74)"}}>
+              Nur Academy currently uses only two frontend roles: <strong>Student</strong> and <strong>Admin</strong>. Public signup always creates student accounts. Admin access is managed separately.
+            </div>
+          </div>
         </div>
-        <Divider/>
-        <form onSubmit={handleSubmit} autoComplete="on" style={{marginTop:18}}>
-          <div style={{marginBottom:13}}>
-            <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Email</label>
-            <div style={{position:"relative"}}>
-              <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}>📧</span>
-              <input
-                type="email"
-                name="email"
-                autoComplete="username"
-                autoCapitalize="none"
-                value={form.email}
-                onChange={e=>setForm(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="you@example.com"
-                style={{width:"100%",padding:"10px 12px 10px 35px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".85rem",background:C.cream}}
-              />
-            </div>
+        <div className="auth-card" style={{background:"white",borderRadius:26,padding:34,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
+          <div style={{display:"flex",gap:8,marginBottom:18}}>
+            {[
+              ["student","Student Login"],
+              ["admin","Admin Login"],
+            ].map(([value, label]) => {
+              const active = accessMode === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setAccessMode(value)}
+                  style={{
+                    flex:1,
+                    padding:"10px 12px",
+                    borderRadius:12,
+                    border:`1px solid ${active ? C.em : C.border}`,
+                    background:active ? `${C.em}0D` : C.cream,
+                    color:active ? C.emD : C.textM,
+                    fontWeight:800,
+                    fontSize:".8rem",
+                    cursor:"pointer",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-          <div style={{marginBottom:13}}>
-            <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Password</label>
-            <div style={{position:"relative"}}>
-              <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}>🔒</span>
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                autoComplete="current-password"
-                value={form.password}
-                onChange={e=>setForm(prev => ({ ...prev, password: e.target.value }))}
-                placeholder="Enter your password"
-                style={{width:"100%",padding:"10px 82px 10px 35px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".85rem",background:C.cream}}
-              />
-              <button
-                type="button"
-                onClick={()=>setShowPassword(open => !open)}
-                style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",border:"none",background:"none",color:C.em,fontWeight:700,fontSize:".72rem",cursor:"pointer"}}
-              >
-                {showPassword ? "Hide" : "Show"}
-              </button>
-            </div>
+          <div style={{marginBottom:18}}>
+            <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.5rem",color:C.emD,marginBottom:6}}>
+              {accessMode === "admin" ? "Sign in to the admin workspace" : "Sign in to continue learning"}
+            </h2>
+            <p style={{fontSize:".82rem",lineHeight:1.65,color:C.textL}}>
+              {accessMode === "admin"
+                ? "Only assigned admin accounts can enter this area."
+                : "Student accounts can access dashboards, course progress, certificates, and support."}
+            </p>
           </div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginTop:-2,marginBottom:12,flexWrap:"wrap"}}>
-            <label style={{display:"inline-flex",alignItems:"center",gap:8,fontSize:".75rem",color:C.textM,cursor:"pointer"}}>
-              <input
-                type="checkbox"
-                checked={rememberEmail}
-                onChange={e => {
-                  const nextValue = e.target.checked;
-                  setRememberEmail(nextValue);
-                  if (!nextValue) ls.remove(K.LOGIN_EMAIL);
-                }}
-              />
-              Remember email
-            </label>
-            <button
-              type="button"
-              onClick={toggleForgot}
-              style={{border:"none",background:"none",padding:0,color:C.em,fontSize:".75rem",fontWeight:700,cursor:"pointer"}}
-            >
-              {forgotOpen ? "Hide reset form" : "Forgot password?"}
-            </button>
-          </div>
-          {forgotOpen&&(
-            <div style={{marginBottom:13,padding:"12px",borderRadius:10,background:`${C.em}08`,border:`1px solid ${C.em}18`}}>
-              <div style={{fontSize:".75rem",fontWeight:700,color:C.emD,marginBottom:4}}>Reset Password On This Browser</div>
-              <div style={{fontSize:".72rem",color:C.textL,lineHeight:1.6,marginBottom:10}}>
-                Enter the account email and choose a new password. Until a hosted backend is connected, this reset works only for accounts stored in this browser.
-              </div>
-              <div style={{marginBottom:9}}>
-                <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Email</label>
+          <Divider/>
+          <form onSubmit={handleSubmit} autoComplete="on" style={{marginTop:18}}>
+            <div style={{marginBottom:13}}>
+              <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Email</label>
+              <div style={{position:"relative"}}>
+                <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}>📧</span>
                 <input
                   type="email"
-                  name="reset-email"
-                  autoComplete="email"
+                  name="email"
+                  autoComplete="username"
                   autoCapitalize="none"
-                  value={resetForm.email}
-                  onChange={e=>setResetForm(prev => ({ ...prev, email: e.target.value }))}
+                  value={form.email}
+                  onChange={e=>setForm(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="you@example.com"
-                  style={{width:"100%",padding:"9px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".82rem",background:"white"}}
+                  style={{width:"100%",padding:"10px 12px 10px 35px",borderRadius:10,border:`1px solid ${C.border}`,fontSize:".85rem",background:C.cream}}
                 />
               </div>
-              <div style={{marginBottom:9}}>
-                <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>New Password</label>
+            </div>
+            <div style={{marginBottom:13}}>
+              <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Password</label>
+              <div style={{position:"relative"}}>
+                <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}>🔒</span>
                 <input
-                  type="password"
-                  name="reset-password"
-                  autoComplete="new-password"
-                  value={resetForm.password}
-                  onChange={e=>setResetForm(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="Minimum 8 characters"
-                  style={{width:"100%",padding:"9px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".82rem",background:"white"}}
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
+                  value={form.password}
+                  onChange={e=>setForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Enter your password"
+                  style={{width:"100%",padding:"10px 82px 10px 35px",borderRadius:10,border:`1px solid ${C.border}`,fontSize:".85rem",background:C.cream}}
                 />
+                <button
+                  type="button"
+                  onClick={()=>setShowPassword(open => !open)}
+                  style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",border:"none",background:"none",color:C.em,fontWeight:700,fontSize:".72rem",cursor:"pointer"}}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
               </div>
-              <div style={{marginBottom:9}}>
-                <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Confirm Password</label>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginTop:-2,marginBottom:12,flexWrap:"wrap"}}>
+              <label style={{display:"inline-flex",alignItems:"center",gap:8,fontSize:".75rem",color:C.textM,cursor:"pointer"}}>
                 <input
-                  type="password"
-                  name="reset-confirm-password"
-                  autoComplete="new-password"
-                  value={resetForm.confirm}
-                  onChange={e=>setResetForm(prev => ({ ...prev, confirm: e.target.value }))}
-                  placeholder="Re-enter new password"
-                  style={{width:"100%",padding:"9px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".82rem",background:"white"}}
+                  type="checkbox"
+                  checked={rememberEmail}
+                  onChange={e => {
+                    const nextValue = e.target.checked;
+                    setRememberEmail(nextValue);
+                    if (!nextValue) ls.remove(K.LOGIN_EMAIL);
+                  }}
                 />
-              </div>
-              {resetError&&<div style={{marginBottom:10,fontSize:".76rem",color:C.red}}>{resetError}</div>}
-              <Btn
-                v="outline"
-                onClick={handleResetPassword}
-                disabled={resetLoading}
-                style={{width:"100%",justifyContent:"center"}}
+                Remember email
+              </label>
+              <button
+                type="button"
+                onClick={toggleForgot}
+                style={{border:"none",background:"none",padding:0,color:C.em,fontSize:".75rem",fontWeight:700,cursor:"pointer"}}
               >
-                {resetLoading ? "Updating password..." : "Reset Password"}
-              </Btn>
+                {forgotOpen ? "Hide reset form" : "Forgot password?"}
+              </button>
             </div>
-          )}
-          {notice&&<div style={{marginBottom:12,fontSize:".78rem",color:C.green}}>{notice}</div>}
-          {error&&<div style={{marginBottom:12,fontSize:".78rem",color:C.red}}>{error}</div>}
-          <button type="submit" className="btn" disabled={loading || !form.email || !form.password}
-            style={{width:"100%",justifyContent:"center",padding:12,borderRadius:11,background:loading?C.textL:`linear-gradient(135deg,${C.em},${C.gold})`,color:"white",fontSize:".93rem",fontWeight:700,boxShadow:"0 4px 16px rgba(11,82,64,.24)"}}>
-            {loading?<><div style={{width:15,height:15,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"white",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>Signing in…</>:"Sign In →"}
-          </button>
-          <p style={{textAlign:"center",marginTop:14,fontSize:".78rem",color:C.textL}}>
-            Need learner access? <span onClick={()=>setPage("register")} style={{color:C.em,fontWeight:600,cursor:"pointer"}}>Create Account</span>
-          </p>
-          <div style={{marginTop:11,padding:"10px 12px",background:`${C.gold}0E`,borderRadius:8,border:`1px solid ${C.gold}22`}}>
-            <div style={{fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:5}}>LMS-style role-based access</div>
-            <div style={{fontSize:".72rem",color:C.textM,lineHeight:1.65}}>
-              Administrators sign in with academy credentials and get access to user management, course management, and certificate records. Learners can create an account to access their dashboard, progress, notes, and certificates.
+            {forgotOpen&&(
+              <div style={{marginBottom:13,padding:"14px",borderRadius:14,background:`${C.em}08`,border:`1px solid ${C.em}18`}}>
+                <div style={{fontSize:".78rem",fontWeight:700,color:C.emD,marginBottom:4}}>Reset Password</div>
+                <div style={{fontSize:".72rem",color:C.textL,lineHeight:1.6,marginBottom:10}}>
+                  Enter the account email and choose a new password for this academy frontend preview.
+                </div>
+                <div style={{marginBottom:9}}>
+                  <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Email</label>
+                  <input
+                    type="email"
+                    name="reset-email"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    value={resetForm.email}
+                    onChange={e=>setResetForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="you@example.com"
+                    style={{width:"100%",padding:"9px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".82rem",background:"white"}}
+                  />
+                </div>
+                <div style={{marginBottom:9}}>
+                  <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>New Password</label>
+                  <input
+                    type="password"
+                    name="reset-password"
+                    autoComplete="new-password"
+                    value={resetForm.password}
+                    onChange={e=>setResetForm(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Minimum 8 characters"
+                    style={{width:"100%",padding:"9px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".82rem",background:"white"}}
+                  />
+                </div>
+                <div style={{marginBottom:9}}>
+                  <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Confirm Password</label>
+                  <input
+                    type="password"
+                    name="reset-confirm-password"
+                    autoComplete="new-password"
+                    value={resetForm.confirm}
+                    onChange={e=>setResetForm(prev => ({ ...prev, confirm: e.target.value }))}
+                    placeholder="Re-enter new password"
+                    style={{width:"100%",padding:"9px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".82rem",background:"white"}}
+                  />
+                </div>
+                {resetError&&<div style={{marginBottom:10,fontSize:".76rem",color:C.red}}>{resetError}</div>}
+                <Btn
+                  v="outline"
+                  onClick={handleResetPassword}
+                  disabled={resetLoading}
+                  style={{width:"100%",justifyContent:"center"}}
+                >
+                  {resetLoading ? "Updating password..." : "Reset Password"}
+                </Btn>
+              </div>
+            )}
+            {notice&&<div style={{marginBottom:12,fontSize:".78rem",color:C.green}}>{notice}</div>}
+            {error&&<div style={{marginBottom:12,fontSize:".78rem",color:C.red}}>{error}</div>}
+            <button type="submit" className="btn" disabled={loading || !form.email || !form.password}
+              style={{width:"100%",justifyContent:"center",padding:12,borderRadius:12,background:loading?C.textL:`linear-gradient(135deg,${C.em},${C.gold})`,color:"white",fontSize:".93rem",fontWeight:700,boxShadow:"0 4px 16px rgba(11,82,64,.24)"}}>
+              {loading?<><div style={{width:15,height:15,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"white",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>Signing in…</>:accessMode === "admin" ? "Enter Admin Workspace" : "Enter Student Dashboard"}
+            </button>
+            <div style={{position:"relative",marginTop:16}}>
+              <div style={{position:"absolute",inset:"0",display:"flex",alignItems:"center"}}>
+                <div style={{width:"100%",borderTop:`1px solid ${C.border}`}}/>
+              </div>
+              <div style={{position:"relative",display:"flex",justifyContent:"center"}}>
+                <span style={{background:"white",padding:"0 10px",fontSize:".7rem",textTransform:"uppercase",color:C.textL,letterSpacing:".06em",fontWeight:700}}>Or continue with</span>
+              </div>
             </div>
-            <div style={{fontSize:".68rem",color:C.textL,marginTop:6}}>Access data is currently stored in this browser until your hosted backend is connected.</div>
-          </div>
-        </form>
+
+            <button
+              type="button"
+              onClick={signInWithGoogle}
+              style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,padding:"11px 16px",marginTop:14,borderRadius:12,border:`1px solid ${C.border}`,background:C.cream,color:C.textM,fontSize:".85rem",fontWeight:600,cursor:"pointer",transition:"all .2s"}}
+            >
+              <GoogleIcon/>
+              <span>Sign in with Google</span>
+            </button>
+
+            <p style={{textAlign:"center",marginTop:16,fontSize:".78rem",color:C.textL}}>
+              Need student access? <span onClick={()=>setPage("register")} style={{color:C.em,fontWeight:600,cursor:"pointer"}}>Create a student account</span>
+            </p>
+            <div style={{marginTop:12,padding:"12px 14px",background:C.cream,borderRadius:12,border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:".69rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:5}}>Access Rules</div>
+              <div style={{fontSize:".76rem",lineHeight:1.65,color:C.textM}}>
+                Student signup creates student accounts only. Admin accounts are assigned by Nur Academy and are signed in from this same page using admin mode.
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -5134,8 +6450,10 @@ const RegisterPage = ({ setPage, onRegister }) => {
     lastName: "",
     email: "",
     password: "",
+    confirmPassword: "",
     agreed: false,
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -5144,6 +6462,7 @@ const RegisterPage = ({ setPage, onRegister }) => {
     if (!form.firstName.trim() || !form.lastName.trim()) return setError("Please enter your full name.");
     if (!form.email.trim()) return setError("Please enter your email.");
     if (form.password.trim().length < 8) return setError("Password must be at least 8 characters.");
+    if (form.password !== form.confirmPassword) return setError("Password confirmation does not match.");
     if (!form.agreed) return setError("Please accept the terms to continue.");
 
     setLoading(true);
@@ -5164,59 +6483,132 @@ const RegisterPage = ({ setPage, onRegister }) => {
   };
 
   return (
-    <div className="page" style={{paddingTop:64,minHeight:"100vh",background:`linear-gradient(160deg,${C.emD},${C.em})`,display:"flex",alignItems:"center",justifyContent:"center",padding:"64px 20px 36px",position:"relative"}}>
+    <div className="page" style={{paddingTop:64,minHeight:"100vh",background:`linear-gradient(160deg,${C.emD},${C.em})`,padding:"92px 20px 40px",position:"relative",overflow:"hidden"}}>
       <Iso op={0.06} col={C.gold}/>
-      <div className="auth-card" style={{background:"white",borderRadius:20,padding:38,maxWidth:430,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
-        <div style={{textAlign:"center",marginBottom:20}}>
-          <h1 style={{fontFamily:"'Amiri',serif",fontSize:"1.45rem",color:C.emD}}>Create Learner Account</h1>
-          <p style={{fontFamily:"'Amiri',serif",color:C.gold}}>إنشاء حساب طالب</p>
-        </div>
-        <Divider/>
-        <form onSubmit={handleSubmit} autoComplete="on" style={{marginTop:18}}>
-          <div className="auth-name-grid grid-2" style={{gridTemplateColumns:"1fr 1fr",gap:11,marginBottom:11}}>
-            {[["First Name","firstName","Ahmad"],["Last Name","lastName","Al-Farsi"]].map(([label,key,placeholder])=>(
-              <div key={label}>
-                <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
-                <input
-                  name={key}
-                  autoComplete={key === "firstName" ? "given-name" : "family-name"}
-                  value={form[key]}
-                  onChange={e=>setForm(prev => ({ ...prev, [key]: e.target.value }))}
-                  placeholder={placeholder}
-                  style={{width:"100%",padding:"8px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".83rem",background:C.cream}}/>
+      <div className="split-grid" style={{maxWidth:1080,margin:"0 auto",gridTemplateColumns:"1fr minmax(360px,440px)",gap:28,alignItems:"center",position:"relative",zIndex:1}}>
+        <div style={{color:"white"}}>
+          <Badge col={C.gold}>Student Signup Only</Badge>
+          <h1 style={{fontFamily:"'Amiri',serif",fontSize:"clamp(2.2rem,5vw,3.3rem)",lineHeight:1.08,margin:"16px 0 8px"}}>Create your Nur Academy student account</h1>
+          <p style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:"1rem",marginBottom:16}}>إنشاء حساب الطالب في نور أكاديمي</p>
+          <p style={{maxWidth:620,color:"rgba(255,255,255,.78)",lineHeight:1.8,fontSize:".95rem",marginBottom:18}}>
+            Join the academy as a student to browse courses, enroll in classes, continue lessons, track completion, and unlock certificates when eligible.
+          </p>
+          <div className="grid-3" style={{gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12}}>
+            {[
+              { title:"Student dashboard", detail:"Keep your courses, certificates, and support requests together." },
+              { title:"Course progress", detail:"Resume lessons and track what you have already completed." },
+              { title:"Admin protected", detail:"Admin accounts are never created from public signup." },
+            ].map(item => (
+              <div key={item.title} style={{padding:"16px 16px 14px",borderRadius:18,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",backdropFilter:"blur(10px)"}}>
+                <div style={{fontSize:".74rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.gold,marginBottom:7}}>{item.title}</div>
+                <div style={{fontSize:".82rem",lineHeight:1.7,color:"rgba(255,255,255,.74)"}}>{item.detail}</div>
               </div>
             ))}
           </div>
-          {[["Email","email","you@example.com"],["Password","password","Minimum 8 characters"]].map(([label,key,placeholder])=>(
-            <div key={label} style={{marginBottom:11}}>
-              <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
-              <input
-                type={key==="password"?"password":"email"}
-                name={key}
-                autoComplete={key==="password" ? "new-password" : "email"}
-                autoCapitalize="none"
-                value={form[key]}
-                onChange={e=>setForm(prev => ({ ...prev, [key]: e.target.value }))}
-                placeholder={placeholder}
-                style={{width:"100%",padding:"8px 11px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".83rem",background:C.cream}}/>
-            </div>
-          ))}
-          <label style={{display:"flex",gap:7,alignItems:"flex-start",margin:"13px 0",cursor:"pointer"}}>
-            <input type="checkbox" checked={form.agreed} onChange={e=>setForm(prev => ({ ...prev, agreed: e.target.checked }))} style={{marginTop:2,accentColor:C.em}}/>
-            <span style={{fontSize:".76rem",color:C.textM,lineHeight:1.5}}>I agree to the <span style={{color:C.em}}>Terms</span> and <span style={{color:C.em}}>Privacy Policy</span></span>
-          </label>
-          {error&&<div style={{marginBottom:12,fontSize:".78rem",color:C.red}}>{error}</div>}
-          <button type="submit" className="btn" disabled={loading}
-            style={{width:"100%",justifyContent:"center",padding:12,borderRadius:11,background:loading?C.textL:`linear-gradient(135deg,${C.gold},${C.goldL})`,color:"white",fontSize:".93rem",fontWeight:700,boxShadow:"0 4px 16px rgba(201,168,76,.26)"}}>
-            {loading?<><div style={{width:15,height:15,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"white",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>Creating…</>:"🌟 Create Free Account"}
-          </button>
-          <p style={{textAlign:"center",marginTop:13,fontSize:".78rem",color:C.textL}}>
-            Already have an account? <span onClick={()=>setPage("login")} style={{color:C.em,fontWeight:600,cursor:"pointer"}}>Sign In</span>
-          </p>
-          <div style={{marginTop:11,padding:"8px 12px",background:`${C.gold}0E`,borderRadius:8,border:`1px solid ${C.gold}22`,textAlign:"center"}}>
-            <div style={{fontSize:".68rem",color:C.textM}}>Learner accounts are stored in this browser for now until your hosted authentication system is connected.</div>
+        </div>
+        <div className="auth-card" style={{background:"white",borderRadius:26,padding:34,width:"100%",position:"relative",zIndex:1,boxShadow:"0 26px 66px rgba(0,0,0,.24)"}}>
+          <div style={{marginBottom:18}}>
+            <h2 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.5rem",color:C.emD,marginBottom:6}}>Create student account</h2>
+            <p style={{fontSize:".82rem",lineHeight:1.65,color:C.textL}}>
+              This signup creates a <strong>student</strong> account only. Admin access is assigned separately by the academy.
+            </p>
           </div>
-        </form>
+          <Divider/>
+          <form onSubmit={handleSubmit} autoComplete="on" style={{marginTop:18}}>
+            <div className="auth-name-grid grid-2" style={{gridTemplateColumns:"1fr 1fr",gap:11,marginBottom:11}}>
+              {[["First Name","firstName","Ahmad"],["Last Name","lastName","Al-Farsi"]].map(([label,key,placeholder])=>(
+                <div key={label}>
+                  <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
+                  <input
+                    name={key}
+                    autoComplete={key === "firstName" ? "given-name" : "family-name"}
+                    value={form[key]}
+                    onChange={e=>setForm(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    style={{width:"100%",padding:"9px 11px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".83rem",background:C.cream}}/>
+                </div>
+              ))}
+            </div>
+            <div style={{marginBottom:11}}>
+              <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Email</label>
+              <input
+                type="email"
+                name="email"
+                autoComplete="email"
+                autoCapitalize="none"
+                value={form.email}
+                onChange={e=>setForm(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="you@example.com"
+                style={{width:"100%",padding:"9px 11px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".83rem",background:C.cream}}/>
+            </div>
+            <div style={{marginBottom:11}}>
+              <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Password</label>
+              <div style={{position:"relative"}}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="new-password"
+                  autoCapitalize="none"
+                  value={form.password}
+                  onChange={e=>setForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Minimum 8 characters"
+                  style={{width:"100%",padding:"9px 74px 9px 11px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".83rem",background:C.cream}}/>
+                <button type="button" onClick={()=>setShowPassword(open => !open)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",border:"none",background:"none",color:C.em,fontWeight:700,fontSize:".72rem",cursor:"pointer"}}>
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+            <div style={{marginBottom:11}}>
+              <label style={{display:"block",fontSize:".68rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Confirm Password</label>
+              <input
+                type={showPassword ? "text" : "password"}
+                name="confirmPassword"
+                autoComplete="new-password"
+                autoCapitalize="none"
+                value={form.confirmPassword}
+                onChange={e=>setForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                placeholder="Re-enter your password"
+                style={{width:"100%",padding:"9px 11px",borderRadius:9,border:`1px solid ${C.border}`,fontSize:".83rem",background:C.cream}}/>
+            </div>
+            <label style={{display:"flex",gap:7,alignItems:"flex-start",margin:"13px 0",cursor:"pointer"}}>
+              <input type="checkbox" checked={form.agreed} onChange={e=>setForm(prev => ({ ...prev, agreed: e.target.checked }))} style={{marginTop:2,accentColor:C.em}}/>
+              <span style={{fontSize:".76rem",color:C.textM,lineHeight:1.5}}>I agree to the <span style={{color:C.em}}>Terms</span> and <span style={{color:C.em}}>Privacy Policy</span></span>
+            </label>
+            {error&&<div style={{marginBottom:12,fontSize:".78rem",color:C.red}}>{error}</div>}
+            <button type="submit" className="btn" disabled={loading}
+              style={{width:"100%",justifyContent:"center",padding:12,borderRadius:12,background:loading?C.textL:`linear-gradient(135deg,${C.gold},${C.goldL})`,color:"white",fontSize:".93rem",fontWeight:700,boxShadow:"0 4px 16px rgba(201,168,76,.26)"}}>
+              {loading?<><div style={{width:15,height:15,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"white",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>Creating…</>:"Create Student Account"}
+            </button>
+
+            <div style={{position:"relative",marginTop:16}}>
+              <div style={{position:"absolute",inset:"0",display:"flex",alignItems:"center"}}>
+                <div style={{width:"100%",borderTop:`1px solid ${C.border}`}}/>
+              </div>
+              <div style={{position:"relative",display:"flex",justifyContent:"center"}}>
+                <span style={{background:"white",padding:"0 10px",fontSize:".7rem",textTransform:"uppercase",color:C.textL,letterSpacing:".06em",fontWeight:700}}>Or sign up with</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={signInWithGoogle}
+              style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,padding:"11px 16px",marginTop:14,borderRadius:12,border:`1px solid ${C.border}`,background:C.cream,color:C.textM,fontSize:".85rem",fontWeight:600,cursor:"pointer",transition:"all .2s"}}
+            >
+              <GoogleIcon/>
+              <span>Sign up with Google</span>
+            </button>
+
+            <p style={{textAlign:"center",marginTop:16,fontSize:".78rem",color:C.textL}}>
+              Already have an account? <span onClick={()=>setPage("login")} style={{color:C.em,fontWeight:600,cursor:"pointer"}}>Sign In</span>
+            </p>
+            <div style={{marginTop:12,padding:"12px 14px",background:C.cream,borderRadius:12,border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:".69rem",fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:C.textL,marginBottom:5}}>Before You Join</div>
+              <div style={{fontSize:".76rem",lineHeight:1.65,color:C.textM}}>
+                Public signup is for students only. Once you register, you can enroll in courses, continue lessons, track completion, and access support from your dashboard.
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -5438,41 +6830,39 @@ const AdminPage = ({ setPage, currentUser }) => {
   const [users, setUsers] = useState(() => AdminDB.users());
   const [customCourses, setCustomCourses] = useState(() => AdminDB.customCourses());
   const [certificates, setCertificates] = useState(() => AdminDB.certificates());
+  const [supportTickets, setSupportTickets] = useState(() => SupportDB.all());
   const [notice, setNotice] = useState({ type:"", text:"" });
+  const [editingCourseId, setEditingCourseId] = useState(null);
   const [userForm, setUserForm] = useState({
     name: "",
     email: "",
     password: "",
     role: "student",
   });
-  const [courseForm, setCourseForm] = useState({
-    title: "",
-    titleAr: "",
-    instructor: "",
-    category: "Fiqh",
-    level: "Beginner",
-    thumb: "📘",
-    color: C.em,
-    playlist: "",
-    firstVideoId: "",
-    firstLessonTitle: "Lesson 01 - Introduction",
-    firstLessonDuration: "15:00",
-    desc: "",
-  });
+  const [courseForm, setCourseForm] = useState(() => buildAdminCourseFormState());
   const noticeTimer = useRef(null);
-  const courseCatalog = getCourseCatalog();
+  const courseCatalog = getCourseCatalog({ includeHidden:true });
   const blockedCount = users.filter(user => user.blockedAt).length;
   const studentCount = users.filter(user => user.role !== "admin").length;
   const adminCount = users.filter(user => user.role === "admin").length;
+  const publishedCourseCount = courseCatalog.filter(isCourseVisible).length;
+  const draftCourseCount = customCourses.filter(course => course.isVisible === false).length;
   const recentUsers = [...users].sort((a, b) => String(b.joinedAt || "").localeCompare(String(a.joinedAt || ""))).slice(0, 5);
   const recentCertificates = certificates.slice(0, 6);
   const adminCertificateStatus = AdminDB.certificateStatusForUser(currentUser?.id || "");
   const adminIssuedCertificates = certificates.filter(record => record.user.id === currentUser?.id);
+  const supportCounts = supportTickets.reduce((summary, ticket) => {
+    const key = SUPPORT_STATUS_META[ticket.status] ? ticket.status : "open";
+    summary.total += 1;
+    summary[key] += 1;
+    return summary;
+  }, { total:0, open:0, in_review:0, resolved:0 });
 
   const sync = useCallback(() => {
     setUsers(AdminDB.users());
     setCustomCourses(AdminDB.customCourses());
     setCertificates(AdminDB.certificates());
+    setSupportTickets(SupportDB.all());
   }, []);
 
   const flash = useCallback((text, type="success") => {
@@ -5551,27 +6941,49 @@ const AdminPage = ({ setPage, currentUser }) => {
     }
   };
 
-  const handleCreateCourse = (event) => {
+  const handleSaveCourse = (event) => {
     event.preventDefault();
     try {
-      AdminDB.createCourse(courseForm);
-      setCourseForm({
-        title: "",
-        titleAr: "",
-        instructor: "",
-        category: "Fiqh",
-        level: "Beginner",
-        thumb: "📘",
-        color: C.em,
-        playlist: "",
-        firstVideoId: "",
-        firstLessonTitle: "Lesson 01 - Introduction",
-        firstLessonDuration: "15:00",
-        desc: "",
-      });
+      const isEditing = Boolean(editingCourseId);
+      if (isEditing) {
+        AdminDB.updateCourse(editingCourseId, courseForm);
+      } else {
+        AdminDB.createCourse(courseForm);
+      }
+      setCourseForm(buildAdminCourseFormState());
+      setEditingCourseId(null);
       sync();
-      flash("Custom course added.");
+      flash(isEditing ? "Custom course updated." : "Custom course added.");
       setSec("courses");
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
+
+  const handleEditCourse = (course) => {
+    setEditingCourseId(course.id);
+    setCourseForm(buildAdminCourseFormState(course));
+    window.scrollTo({ top:0, behavior:"smooth" });
+  };
+
+  const handleCancelCourseEdit = () => {
+    setEditingCourseId(null);
+    setCourseForm(buildAdminCourseFormState());
+  };
+
+  const handleToggleCourseVisibility = (course) => {
+    if (!course.adminManaged) return;
+    try {
+      AdminDB.updateCourse(course.id, {
+        ...course,
+        status: course.isVisible === false ? "published" : "draft",
+      });
+      if (editingCourseId === course.id) {
+        setEditingCourseId(null);
+        setCourseForm(buildAdminCourseFormState());
+      }
+      sync();
+      flash(course.isVisible === false ? "Course published to the student catalog." : "Course moved to draft and hidden from the catalog.");
     } catch (error) {
       flash(error.message, "error");
     }
@@ -5581,6 +6993,10 @@ const AdminPage = ({ setPage, currentUser }) => {
     if (!window.confirm(`Delete the custom course "${course.title}" from this browser?`)) return;
     try {
       AdminDB.deleteCourse(course.id);
+      if (editingCourseId === course.id) {
+        setEditingCourseId(null);
+        setCourseForm(buildAdminCourseFormState());
+      }
       sync();
       flash("Custom course deleted.");
     } catch (error) {
@@ -5599,6 +7015,17 @@ const AdminPage = ({ setPage, currentUser }) => {
       flash(error.message, "error");
     }
   };
+  const handleSupportStatus = (ticket, status) => {
+    const note = window.prompt(`Add or update an internal note for ${ticket.userName}`, ticket.adminNote || "");
+    if (note === null) return;
+    try {
+      SupportDB.update(ticket.id, { status, adminNote: note.trim() });
+      sync();
+      flash(`Support request ${ticket.id} updated.`);
+    } catch (error) {
+      flash(error.message, "error");
+    }
+  };
 
   if (!currentUser || currentUser.role !== "admin") {
     return (
@@ -5606,7 +7033,7 @@ const AdminPage = ({ setPage, currentUser }) => {
         <div style={{maxWidth:460,background:"white",borderRadius:16,padding:28,border:`1px solid ${C.border}`,boxShadow:C.sh,textAlign:"center"}}>
           <div style={{fontSize:"2.2rem",marginBottom:11}}>🔒</div>
           <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.35rem",color:C.emD,marginBottom:8}}>Admin Access Required</h1>
-          <p style={{fontSize:".84rem",color:C.textL,lineHeight:1.7,marginBottom:16}}>The admin panel is available only to authenticated administrator accounts. Sign in with your assigned admin credentials or connect a hosted auth provider when you move to Railway.</p>
+          <p style={{fontSize:".84rem",color:C.textL,lineHeight:1.7,marginBottom:16}}>The admin workspace is available only to authenticated administrator accounts. Sign in with an approved academy admin account to manage students, courses, certificates, and support requests.</p>
           <Btn v="primary" onClick={()=>setPage("dashboard")}>Return to Dashboard</Btn>
         </div>
       </div>
@@ -5618,9 +7045,9 @@ const AdminPage = ({ setPage, currentUser }) => {
       <div className="admin-sidebar" style={{width:200,background:C.emD,padding:"18px 10px",position:"fixed",top:64,bottom:0}}>
         <div style={{padding:"9px 6px 17px",borderBottom:"1px solid rgba(255,255,255,.1)",marginBottom:9}}>
           <div style={{fontFamily:"'Amiri',serif",color:C.gold,fontSize:".83rem"}}>نور أكاديمي</div>
-          <div style={{color:"white",fontWeight:700,fontSize:".78rem"}}>Admin Panel</div>
+          <div style={{color:"white",fontWeight:700,fontSize:".78rem"}}>Admin Workspace</div>
         </div>
-        {[["📊","Overview","overview"],["👥","Users","users"],["📚","Courses","courses"],["🏆","Certificates","certs"]].map(([ic,l,k])=>(
+        {[["📊","Overview","overview"],["👥","Users","users"],["📚","Courses","courses"],["🏆","Certificates","certs"],["🛟","Support","support"]].map(([ic,l,k])=>(
           <div key={k} onClick={()=>setSec(k)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 11px",borderRadius:7,cursor:"pointer",marginBottom:2,transition:"all .2s",background:sec===k?"rgba(201,168,76,.18)":"transparent",color:sec===k?C.gold:"rgba(255,255,255,.52)",fontSize:".8rem",fontWeight:sec===k?600:400}}>
             <span>{ic}</span>{l}
           </div>
@@ -5638,17 +7065,20 @@ const AdminPage = ({ setPage, currentUser }) => {
         {sec==="overview"&&(
           <div className="page">
             <div className="admin-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-              <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E"}}>Admin Overview</h1>
+              <div>
+                <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E",marginBottom:4}}>Admin Overview</h1>
+                <div style={{fontSize:".8rem",color:"#6B7280"}}>Monitor learners, review course activity, and keep academy operations organized.</div>
+              </div>
               <div style={{display:"flex",gap:8}}>
                 <Btn v="outline" onClick={()=>setSec("users")}>Manage Users</Btn>
                 <Btn v="gold" onClick={()=>setSec("courses")}>Add Course</Btn>
               </div>
             </div>
             <div style={{background:"white",borderRadius:12,padding:"13px 16px",boxShadow:"0 2px 8px rgba(0,0,0,.06)",marginBottom:16,fontSize:".78rem",color:"#6B7280",lineHeight:1.6}}>
-              These admin tools now work locally in this browser. Users, blocked status, custom courses, and certificate records are persisted in local storage until you connect a hosted backend.
+              Frontend preview mode is active. Student and admin flows are live, and academy records in this workspace stay available on this device while you prepare the backend.
             </div>
             <div className="grid-4" style={{gridTemplateColumns:"repeat(4,1fr)",gap:13,marginBottom:20}}>
-              {[{icon:"👥",l:"Students",v:String(studentCount),col:C.em},{icon:"🛡️",l:"Admins",v:String(adminCount),col:C.gold},{icon:"📚",l:"Courses",v:String(courseCatalog.length),col:"#7C3AED"},{icon:"🏆",l:"Certificates",v:String(certificates.length),col:C.green}].map((s,i)=>(
+              {[{icon:"👥",l:"Students",v:String(studentCount),col:C.em},{icon:"📚",l:"Courses",v:String(courseCatalog.length),col:"#7C3AED"},{icon:"🏆",l:"Certificates",v:String(certificates.length),col:C.green},{icon:"🛟",l:"Open Support",v:String(supportCounts.open + supportCounts.in_review),col:C.gold}].map((s,i)=>(
                 <div key={i} style={{background:"white",borderRadius:12,padding:16,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
                   <div style={{fontSize:"1.25rem",marginBottom:5}}>{s.icon}</div>
                   <div style={{fontSize:"1.35rem",fontWeight:800,color:s.col}}>{s.v}</div>
@@ -5679,9 +7109,13 @@ const AdminPage = ({ setPage, currentUser }) => {
               <div style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
                 <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:10}}>Quick Status</div>
                 <div style={{display:"grid",gap:10,fontSize:".78rem",color:"#4B5563"}}>
+                  <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{adminCount} admin account{adminCount===1?"":"s"} currently have management access.</div>
                   <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{customCourses.length} custom courses added on this browser.</div>
+                  <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{publishedCourseCount} courses are currently visible to students in the catalog.</div>
+                  <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{draftCourseCount} custom course{draftCourseCount===1?" is":"s are"} currently saved as drafts.</div>
                   <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{blockedCount} blocked user accounts right now.</div>
                   <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{recentCertificates.length} latest certificates are ready for review in the Certificates tab.</div>
+                  <div style={{padding:"10px 12px",borderRadius:10,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>{supportCounts.resolved} support requests have already been marked resolved.</div>
                 </div>
               </div>
             </div>
@@ -5751,9 +7185,15 @@ const AdminPage = ({ setPage, currentUser }) => {
         {sec==="courses"&&(
           <div className="page">
             <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E",marginBottom:18}}>Course Management</h1>
+            <div style={{background:"white",borderRadius:12,padding:"13px 16px",boxShadow:"0 2px 8px rgba(0,0,0,.06)",marginBottom:16,fontSize:".78rem",color:"#6B7280",lineHeight:1.65}}>
+              Built-in academy courses stay protected here, while custom courses can be priced, saved as drafts, published to the student catalog, edited, or removed from this browser.
+            </div>
             <div className="grid-2" style={{gridTemplateColumns:"minmax(340px,430px) 1fr",gap:16}}>
-              <form onSubmit={handleCreateCourse} style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
-                <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E",marginBottom:12}}>Add Custom Course</div>
+              <form onSubmit={handleSaveCourse} style={{background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
+                  <div style={{fontWeight:700,fontSize:".92rem",color:"#1A1A2E"}}>{editingCourseId ? "Edit Custom Course" : "Add Custom Course"}</div>
+                  {editingCourseId && <Badge col={C.gold}>Editing Course</Badge>}
+                </div>
                 {[["Course Title","title","e.g. Fiqh of Prayer"],["Arabic Title","titleAr","e.g. فقه الصلاة"],["Instructor","instructor","e.g. Sheikh Name"],["Thumbnail Emoji","thumb","e.g. 📘"],["Theme Color","color","#0B5240"],["Playlist ID","playlist","e.g. PLxxxxxxxx"],["Featured Video ID","firstVideoId","e.g. dQw4w9WgXcQ"],["First Lesson Title","firstLessonTitle","Lesson 01 - Introduction"],["First Lesson Duration","firstLessonDuration","15:00"]].map(([label,key,placeholder])=>(
                   <div key={key} style={{marginBottom:12}}>
                     <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>{label}</label>
@@ -5774,16 +7214,32 @@ const AdminPage = ({ setPage, currentUser }) => {
                     </select>
                   </div>
                 </div>
+                <div className="grid-2" style={{gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                  <div>
+                    <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Price (USD)</label>
+                    <input type="number" min="0" step="0.01" value={courseForm.price} onChange={e=>setCourseForm(form => ({ ...form, price: e.target.value }))} placeholder="0.00" style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".84rem"}} />
+                  </div>
+                  <div>
+                    <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Catalog Status</label>
+                    <select value={courseForm.status} onChange={e=>setCourseForm(form => ({ ...form, status: e.target.value }))} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".84rem",background:"white"}}>
+                      <option value="published">Published</option>
+                      <option value="draft">Draft / Hidden</option>
+                    </select>
+                  </div>
+                </div>
                 <div style={{marginBottom:14}}>
                   <label style={{display:"block",fontSize:".7rem",fontWeight:700,color:C.textM,marginBottom:4,textTransform:"uppercase",letterSpacing:".06em"}}>Description</label>
                   <textarea value={courseForm.desc} onChange={e=>setCourseForm(form => ({ ...form, desc: e.target.value }))} placeholder="Short course description" style={{width:"100%",minHeight:84,padding:"9px 12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:".84rem",resize:"vertical"}} />
                 </div>
-                <Btn type="submit" v="primary" style={{width:"100%",justifyContent:"center"}}>Create Custom Course</Btn>
+                <div className="action-row" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                  <Btn type="submit" v="primary" style={{flex:"1 1 220px",justifyContent:"center"}}>{editingCourseId ? "Update Custom Course" : "Create Custom Course"}</Btn>
+                  {editingCourseId && <Btn v="outline" style={{flex:"1 1 180px",justifyContent:"center"}} onClick={handleCancelCourseEdit}>Cancel Edit</Btn>}
+                </div>
               </form>
               <div className="table-wrap" style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
                 <div style={{padding:"13px 17px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:".86rem",color:"#1A1A2E"}}>Course Catalog</div>
                 <table>
-                  <thead><tr>{["Course","Category","Lessons","Source","Playlist","Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{["Course","Status","Pricing","Lessons","Source","Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {courseCatalog.map(course=>(
                       <tr key={course.id}>
@@ -5792,17 +7248,27 @@ const AdminPage = ({ setPage, currentUser }) => {
                             <div style={{width:30,height:30,borderRadius:6,background:`${course.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".9rem"}}>{course.thumb}</div>
                             <div>
                               <div style={{fontWeight:700,fontSize:".8rem"}}>{course.title}</div>
-                              <div style={{fontSize:".66rem",color:"#9CA3AF"}}>{course.instructor}</div>
+                              <div style={{fontSize:".66rem",color:"#9CA3AF"}}>{course.instructor} · {course.category}</div>
+                              {course.playlist && <div style={{fontSize:".66rem",color:"#9CA3AF"}}>Playlist: {course.playlist}</div>}
                             </div>
                           </div>
                         </td>
-                        <td><Badge col={C.em}>{course.category}</Badge></td>
+                        <td>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                            <Badge col={isCourseVisible(course) ? C.green : C.gold}>{isCourseVisible(course) ? "Published" : "Draft"}</Badge>
+                            {course.adminManaged && <Badge col={C.gold}>Custom</Badge>}
+                          </div>
+                        </td>
+                        <td><Badge col={course.isFree ? C.em : C.gold}>{course.isFree ? "Free" : `$${Number(course.price || 0).toFixed(2)}`}</Badge></td>
                         <td style={{fontWeight:700}}>{totalLessons(course)}</td>
                         <td><Badge col={course.adminManaged ? C.gold : C.textL}>{course.adminManaged ? "Custom" : "Built In"}</Badge></td>
-                        <td style={{fontSize:".72rem",color:"#4B5563"}}>{course.playlist || "—"}</td>
                         <td>
                           {course.adminManaged ? (
-                            <Btn size="sm" v="danger" onClick={()=>handleDeleteCourse(course)}>Delete</Btn>
+                            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                              <Btn size="sm" v="ghost" onClick={()=>handleEditCourse(course)}>Edit</Btn>
+                              <Btn size="sm" v="outline" onClick={()=>handleToggleCourseVisibility(course)}>{course.isVisible === false ? "Publish" : "Hide"}</Btn>
+                              <Btn size="sm" v="danger" onClick={()=>handleDeleteCourse(course)}>Delete</Btn>
+                            </div>
                           ) : (
                             <span style={{fontSize:".68rem",color:"#9CA3AF"}}>Protected</span>
                           )}
@@ -5880,6 +7346,81 @@ const AdminPage = ({ setPage, currentUser }) => {
             </div>
           </div>
         )}
+        {sec==="support"&&(
+          <div className="page">
+            <div className="admin-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+              <div>
+                <h1 style={{fontFamily:"'Crimson Pro',serif",fontSize:"1.45rem",color:"#1A1A2E",marginBottom:4}}>Support Inbox</h1>
+                <div style={{fontSize:".8rem",color:"#6B7280"}}>Review student issues, course requests, and certificate help requests from one place.</div>
+              </div>
+              <Btn v="outline" onClick={()=>setPage("contact")}>Open Contact Page</Btn>
+            </div>
+            <div style={{background:"white",borderRadius:12,padding:"13px 16px",boxShadow:"0 2px 8px rgba(0,0,0,.06)",marginBottom:16,fontSize:".78rem",color:"#6B7280",lineHeight:1.65}}>
+              Support tickets appear here when they are submitted from the same browser profile. If the student used another phone, browser, or private window, the admin inbox will stay empty until a shared backend is connected.
+            </div>
+            <div className="grid-4" style={{gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:13,marginBottom:16}}>
+              {[
+                { label:"Total Requests", value:supportCounts.total, color:C.em },
+                { label:"Open", value:supportCounts.open, color:C.gold },
+                { label:"In Review", value:supportCounts.in_review, color:"#7C3AED" },
+                { label:"Resolved", value:supportCounts.resolved, color:C.green },
+              ].map(item => (
+                <div key={item.label} style={{background:"white",borderRadius:12,padding:16,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                  <div style={{fontSize:".68rem",fontWeight:700,color:"#6B7280",letterSpacing:".06em",textTransform:"uppercase",marginBottom:6}}>{item.label}</div>
+                  <div style={{fontSize:"1.35rem",fontWeight:800,color:item.color}}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+            {supportTickets.length === 0 ? (
+              <div style={{background:"white",borderRadius:16,padding:32,textAlign:"center",border:`1px solid ${C.border}`}}>
+                <div style={{fontSize:"2rem",marginBottom:10}}>🛟</div>
+                <div style={{fontWeight:700,color:"#1A1A2E",marginBottom:5}}>No support requests yet</div>
+                <div style={{fontSize:".8rem",lineHeight:1.65,color:"#6B7280"}}>Student support requests will appear here once learners start submitting them from the dashboard.</div>
+              </div>
+            ) : (
+              <div style={{display:"grid",gap:14}}>
+                {supportTickets.map(ticket => {
+                  const statusMeta = SUPPORT_STATUS_META[ticket.status] || SUPPORT_STATUS_META.open;
+                  return (
+                    <div key={ticket.id} style={{background:"white",borderRadius:16,padding:20,border:`1px solid ${C.border}`,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                      <div className="admin-header" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14,marginBottom:12}}>
+                        <div>
+                          <div style={{fontWeight:800,fontSize:".96rem",color:"#1A1A2E",marginBottom:4}}>{ticket.subject}</div>
+                          <div style={{fontSize:".76rem",lineHeight:1.6,color:"#6B7280"}}>
+                            {ticket.userName} · {ticket.userEmail} · {ticket.category}
+                            {ticket.courseTitle ? ` · ${ticket.courseTitle}` : ""}
+                          </div>
+                          <div style={{fontSize:".72rem",color:"#9CA3AF",marginTop:4}}>Created {formatDateTime(ticket.createdAt)} · Updated {formatDateTime(ticket.updatedAt)}</div>
+                        </div>
+                        <Badge col={statusMeta.color}>{statusMeta.label}</Badge>
+                      </div>
+                      <div style={{fontSize:".84rem",lineHeight:1.75,color:"#374151",whiteSpace:"pre-wrap",marginBottom:14}}>{ticket.message}</div>
+                      {ticket.screenshot && (
+                        <div style={{marginBottom:14}}>
+                          <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
+                            <div style={{fontSize:".68rem",fontWeight:700,color:"#6B7280",letterSpacing:".06em",textTransform:"uppercase"}}>Student Screenshot</div>
+                            <a href={ticket.screenshot.dataUrl} target="_blank" rel="noreferrer" style={{fontSize:".74rem",fontWeight:700,color:C.em,textDecoration:"none"}}>Open Full Image</a>
+                          </div>
+                          <img src={ticket.screenshot.dataUrl} alt={`Student screenshot for ${ticket.subject}`} style={{width:"100%",maxHeight:280,objectFit:"cover",borderRadius:12,border:"1px solid #E5E7EB",display:"block",marginBottom:6}} />
+                          <div style={{fontSize:".72rem",color:"#6B7280"}}>{ticket.screenshot.name} · {formatBytes(ticket.screenshot.size)}</div>
+                        </div>
+                      )}
+                      <div style={{padding:"12px 14px",borderRadius:12,background:"#F9FAFB",border:"1px solid #E5E7EB",marginBottom:14}}>
+                        <div style={{fontSize:".68rem",fontWeight:700,color:"#6B7280",letterSpacing:".06em",textTransform:"uppercase",marginBottom:5}}>Internal Admin Note</div>
+                        <div style={{fontSize:".78rem",lineHeight:1.65,color:"#4B5563"}}>{ticket.adminNote || "No admin note has been added yet."}</div>
+                      </div>
+                      <div className="action-row" style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                        <Btn size="sm" v="outline" onClick={()=>handleSupportStatus(ticket, "open")}>Mark Open</Btn>
+                        <Btn size="sm" v="primary" onClick={()=>handleSupportStatus(ticket, "in_review")}>Mark In Review</Btn>
+                        <Btn size="sm" v="success" onClick={()=>handleSupportStatus(ticket, "resolved")}>Mark Resolved</Btn>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -5900,23 +7441,65 @@ export default function App() {
     injectCSS();
     let active = true;
     const syncUser = () => { if (active) setCurrentUser(Auth.current()); };
+    const forwardStorageSync = (event) => {
+      const key = event?.key || null;
+      if (!key || Object.values(K).includes(key)) {
+        window.dispatchEvent(new CustomEvent("nur:data"));
+      }
+    };
     (async () => {
       await Auth.ensureSeeded();
+
+      // Handle Google OAuth callback (Supabase session detected in URL)
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const googleUser = session.user;
+          const email = googleUser.email || "";
+          const name = googleUser.user_metadata?.full_name || googleUser.email?.split("@")[0] || "Student";
+          const existing = Auth.users().find(u => u.email === email);
+          if (existing) {
+            ls.set(K.SESSION, { id: existing.id });
+          } else {
+            const newUser = {
+              id: newUserId(),
+              name,
+              email,
+              role: "student",
+              joinedAt: dayKey(),
+              country: "",
+              language: "English / Arabic",
+              blockedAt: null,
+              blockedReason: "",
+              passwordHash: "",
+            };
+            ls.set(K.USERS, [...Auth.users(), newUser]);
+            const allData = readAllUserData();
+            allData[newUser.id] = defaultUserState();
+            ls.set(K.DATA, allData);
+            ls.set(K.SESSION, { id: newUser.id });
+          }
+        }
+      }
+
       pruneStoredCourseData();
       syncUser();
       if (active) setAuthReady(true);
     })();
     window.addEventListener("nur:data", syncUser);
+    window.addEventListener("storage", forwardStorageSync);
     return () => {
       active = false;
       window.removeEventListener("nur:data", syncUser);
+      window.removeEventListener("storage", forwardStorageSync);
     };
   }, []);
   useEffect(() => { window.scrollTo({ top:0, behavior:"smooth" }); }, [page]);
   useEffect(() => {
     if (!authReady) return;
-    if (!currentUser && ["dashboard","lesson","admin"].includes(page)) setPage("login");
+    if (!currentUser && ["dashboard","lesson","admin","certificate"].includes(page)) setPage("login");
     if (currentUser && currentUser.role !== "admin" && page === "admin") setPage("dashboard");
+    if (currentUser && ["login","register"].includes(page)) setPage(currentUser.role === "admin" ? "admin" : "dashboard");
   }, [authReady, currentUser, page]);
 
   const loggedIn = Boolean(currentUser);
@@ -5929,7 +7512,8 @@ export default function App() {
     setPage("home");
   };
   const activeCourse = course ? resolveCourse(course) : null;
-  const certificateCompletion = activeCourse ? DB.courseCompletion(activeCourse.id) : null;
+  const certificateCourse = activeCourse?.activeSeriesCourse || activeCourse;
+  const certificateCompletion = certificateCourse ? DB.courseCompletion(certificateCourse.id) : null;
 
   const noNav    = ["lesson"].includes(page);
   const noFooter = ["lesson","dashboard","admin","login","register"].includes(page);
@@ -5952,7 +7536,7 @@ export default function App() {
 
         {page==="home"          && <HomePage        setPage={setPage} setCourse={setCourse}/>}
         {page==="courses"       && <CoursesPage      setPage={setPage} setCourse={setCourse}/>}
-        {page==="course-detail" && <CourseDetailPage course={course}   setPage={setPage} setLesson={setLesson} loggedIn={loggedIn}/>}
+        {page==="course-detail" && <CourseDetailPage course={course}   setPage={setPage} setLesson={setLesson} setCourse={setCourse} loggedIn={loggedIn}/>}
         {page==="lesson"        && <LessonPage       lessonData={lessonData} setPage={setPage} setLesson={setLesson} setCourse={setCourse}/>}
         {page==="dashboard"     && <DashboardPage    currentUser={currentUser} onSignOut={handleSignOut} onUserUpdated={handleUserUpdated} setPage={setPage} setLesson={(d)=>{ setLesson(d); setPage("lesson"); }}/>}
         {page==="admin"         && <AdminPage        currentUser={currentUser} setPage={setPage}/>}
@@ -5963,11 +7547,11 @@ export default function App() {
         {page==="certificate" && (
           <CertificatePage
             user={currentUser}
-            course={activeCourse}
+            course={certificateCourse}
             completion={certificateCompletion}
             onPrint={() => {
-              if (activeCourse && currentUser && certificateCompletion) {
-                openCertificatePrintWindow(activeCourse, currentUser, certificateCompletion);
+              if (certificateCourse && currentUser && certificateCompletion) {
+                openCertificatePrintWindow(certificateCourse, currentUser, certificateCompletion);
               }
             }}
           />

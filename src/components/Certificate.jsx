@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import QRCode from "react-qr-code";
 import sealImage from "../assets/nur_seal.png";
-import signatureImage from "../assets/signature-optimized.png";
+import signatureImage from "../assets/signature.png";
 import HadiyaSupportCard from "./HadiyaSupportCard";
 
 const LOGO_SRC = `${import.meta.env.BASE_URL}favicon.png`;
