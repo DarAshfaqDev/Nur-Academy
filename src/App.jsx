@@ -7451,35 +7451,40 @@ export default function App() {
       await Auth.ensureSeeded();
 
       // Handle Google OAuth callback (Supabase session detected in URL)
-      if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          const googleUser = session.user;
-          const email = googleUser.email || "";
-          const name = googleUser.user_metadata?.full_name || googleUser.email?.split("@")[0] || "Student";
-          const existing = Auth.users().find(u => u.email === email);
-          if (existing) {
-            ls.set(K.SESSION, { id: existing.id });
-          } else {
-            const newUser = {
-              id: newUserId(),
-              name,
-              email,
-              role: "student",
-              joinedAt: dayKey(),
-              country: "",
-              language: "English / Arabic",
-              blockedAt: null,
-              blockedReason: "",
-              passwordHash: "",
-            };
-            ls.set(K.USERS, [...Auth.users(), newUser]);
-            const allData = readAllUserData();
-            allData[newUser.id] = defaultUserState();
-            ls.set(K.DATA, allData);
-            ls.set(K.SESSION, { id: newUser.id });
+      try {
+        if (supabase) {
+          const supaSession = await supabase.auth.getSession();
+          const session = supaSession?.data?.session || null;
+          if (session?.user) {
+            const googleUser = session.user;
+            const email = googleUser.email || "";
+            const name = googleUser.user_metadata?.full_name || googleUser.email?.split("@")[0] || "Student";
+            const existing = Auth.users().find(u => u.email === email);
+            if (existing) {
+              ls.set(K.SESSION, { id: existing.id });
+            } else {
+              const newUser = {
+                id: newUserId(),
+                name,
+                email,
+                role: "student",
+                joinedAt: dayKey(),
+                country: "",
+                language: "English / Arabic",
+                blockedAt: null,
+                blockedReason: "",
+                passwordHash: "",
+              };
+              ls.set(K.USERS, [...Auth.users(), newUser]);
+              const allData = readAllUserData();
+              allData[newUser.id] = defaultUserState();
+              ls.set(K.DATA, allData);
+              ls.set(K.SESSION, { id: newUser.id });
+            }
           }
         }
+      } catch (e) {
+        console.warn("Supabase check failed (non-blocking):", e);
       }
 
       pruneStoredCourseData();
