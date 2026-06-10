@@ -2127,6 +2127,18 @@ const buildHadithSeriesModules = (items, opts={}) =>
       );
     })
     .filter(section => section.lessons.length > 0);
+const totalLessons = (c) => c.modules.reduce((a,m) => a+m.lessons.length, 0);
+const namespaceModules = (modules=[], prefix="") => {
+  if (!prefix) return modules;
+  return modules.map(module => ({
+    ...module,
+    id: `${prefix}-${module.id}`,
+    lessons: module.lessons.map(lesson => ({
+      ...lesson,
+      id: `${prefix}-${lesson.id}`,
+    })),
+  }));
+};
 const COURSES = [
 
 {
@@ -3228,18 +3240,6 @@ const createLessonState = (courseLike, mi=0, li=0) => {
     mi: nextPosition.mi,
     li: nextPosition.li,
   };
-};
-const totalLessons = (c) => c.modules.reduce((a,m) => a+m.lessons.length, 0);
-const namespaceModules = (modules=[], prefix="") => {
-  if (!prefix) return modules;
-  return modules.map(module => ({
-    ...module,
-    id: `${prefix}-${module.id}`,
-    lessons: module.lessons.map(lesson => ({
-      ...lesson,
-      id: `${prefix}-${lesson.id}`,
-    })),
-  }));
 };
 const courseDoneIds = (course, rawDoneIds=[]) => {
   if (!course) return [];
